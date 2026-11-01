@@ -141,7 +141,12 @@ function AssignmentForm({ options, existing }: { options: Options; existing: Ass
           const path = await uploadFile('/v1/assignments/uploads', file)
           setFiles((prev) => prev.map((f) => (f.key === key ? { ...f, path, uploading: false } : f)))
         } catch (error) {
-          const message = error instanceof ApiError && Array.isArray(error.details) ? (error.details as { message: string }[])[0]?.message : error instanceof Error ? error.message : null
+          const message =
+            error instanceof ApiError && Array.isArray(error.details)
+              ? (error.details as { message: string }[])[0]?.message
+              : error instanceof Error
+                ? error.message
+                : null
           setFiles((prev) => prev.map((f) => (f.key === key ? { ...f, uploading: false, error: message ?? 'Didn’t upload. Remove it and try again.' } : f)))
         }
       }),

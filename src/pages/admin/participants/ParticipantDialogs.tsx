@@ -350,7 +350,11 @@ export function TransferDialog({ open, onClose, person, enrolment, onDone }: Cha
           setTargetError(null)
         }}
         error={targetError}
-        helper={options.length ? `Active and upcoming cohorts in ${enrolment.programme.name}.` : `${enrolment.programme.name} has no other active or upcoming cohorts.`}
+        helper={
+          options.length
+            ? `Active and upcoming cohorts in ${enrolment.programme.name}.`
+            : `${enrolment.programme.name} has no other active or upcoming cohorts.`
+        }
       >
         <option value="">Select a cohort</option>
         {options.map((c) => (
@@ -363,7 +367,10 @@ export function TransferDialog({ open, onClose, person, enrolment, onDone }: Cha
         <DetailList
           items={[
             { label: 'Courses in common', value: common?.length ? common.join(', ') : <span className="font-normal text-muted">None</span> },
-            { label: 'Trainers there', value: trainersThere.length ? trainersThere.join(', ') : <span className="font-normal text-muted">None assigned yet</span> },
+            {
+              label: 'Trainers there',
+              value: trainersThere.length ? trainersThere.join(', ') : <span className="font-normal text-muted">None assigned yet</span>,
+            },
           ]}
         />
       )}

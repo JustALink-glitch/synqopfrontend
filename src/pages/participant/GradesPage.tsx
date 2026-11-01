@@ -34,7 +34,12 @@ export function GradesPage() {
         </Panel>
       ) : query.isError ? (
         <Panel>
-          <StatePanel kind="error" title="Couldn’t load your grades" description="Check your connection and try again." action={{ label: 'Try again', onClick: () => void query.refetch() }} />
+          <StatePanel
+            kind="error"
+            title="Couldn’t load your grades"
+            description="Check your connection and try again."
+            action={{ label: 'Try again', onClick: () => void query.refetch() }}
+          />
         </Panel>
       ) : grades.length === 0 ? (
         <Panel className="py-12">
@@ -43,7 +48,10 @@ export function GradesPage() {
             title="No grades yet"
             body="When you hand in an assignment, it shows here. Your grade and your trainer’s feedback appear as soon as they’re saved."
             actions={
-              <Link to="/participant/assignments" className="inline-flex h-9 items-center rounded-md border border-strong bg-surface px-4 text-label-button text-primary hover:bg-surface-hover">
+              <Link
+                to="/participant/assignments"
+                className="inline-flex h-9 items-center rounded-md border border-strong bg-surface px-4 text-label-button text-primary hover:bg-surface-hover"
+              >
                 Go to assignments
               </Link>
             }
@@ -63,7 +71,11 @@ export function GradesPage() {
                   <Cell className="tabular-nums">{g.gradedAt ? formatDay(g.gradedAt, timeZone) : <span className="text-muted">—</span>}</Cell>
                   <Cell align="right">
                     {g.grade && (
-                      <Link to={g.id} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-caption-strong text-brand-text hover:underline">
+                      <Link
+                        to={g.id}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 text-caption-strong text-brand-text hover:underline"
+                      >
                         View
                         <ChevronRightIcon size={14} />
                       </Link>
@@ -117,7 +129,11 @@ export function FeedbackPage() {
       <>
         <PageHeader title="No grade yet" breadcrumb={[{ label: 'Grades & feedback', to: BASE }]} />
         <Panel>
-          <StatePanel kind="no-results" title="This hasn’t been graded yet" description="Your grade and feedback appear here as soon as your trainer saves them." />
+          <StatePanel
+            kind="no-results"
+            title="This hasn’t been graded yet"
+            description="Your grade and feedback appear here as soon as your trainer saves them."
+          />
         </Panel>
       </>
     )
@@ -138,7 +154,9 @@ export function FeedbackPage() {
         <div className="flex min-w-0 flex-1 flex-col gap-4 max-lg:w-full">
           <Panel aria-labelledby="feedback-title" className="gap-3">
             <PanelHeader id="feedback-title" title={g.gradedBy ? `Feedback from ${g.gradedBy}` : 'Feedback'} />
-            <p className="text-body whitespace-pre-line text-primary">{g.feedback ?? <span className="text-secondary">No written feedback for this one.</span>}</p>
+            <p className="text-body whitespace-pre-line text-primary">
+              {g.feedback ?? <span className="text-secondary">No written feedback for this one.</span>}
+            </p>
           </Panel>
           {a.gradingScale === 'rubric' && (
             <Panel aria-labelledby="rubric-title" className="gap-0">

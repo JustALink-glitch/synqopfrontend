@@ -158,7 +158,9 @@ export function NewCoursePage() {
               {!programmeId ? (
                 <p className="text-body text-secondary">Choose a programme to see its cohorts.</p>
               ) : openCohorts.length === 0 ? (
-                <p className="text-body text-secondary">This programme has no active or upcoming cohorts. New cohorts can pick the course when you create them.</p>
+                <p className="text-body text-secondary">
+                  This programme has no active or upcoming cohorts. New cohorts can pick the course when you create them.
+                </p>
               ) : (
                 <div className="flex flex-col gap-2.5">
                   {openCohorts.map((cohort) => (

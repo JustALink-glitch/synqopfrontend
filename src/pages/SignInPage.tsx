@@ -22,6 +22,9 @@ export function SignInPage() {
   if (state.status === 'signed-in') {
     return <Navigate to={routeState?.from ?? homePath(state.me.membership.role)} replace />
   }
+  if (state.status === 'no-access' && state.reason === 'mfa_required') {
+    return <Navigate to="/sign-in/code" replace state={{ from: routeState?.from }} />
+  }
   if (state.status === 'no-access' && state.reason === 'no_organisation') {
     // R1.03a — resumed after sign-in.
     return <Navigate to="/signup/organisation" replace />
@@ -31,9 +34,7 @@ export function SignInPage() {
     event.preventDefault()
     setSubmitting(true)
     setFailed(null)
-    const { error } = await supabase.auth
-      .signInWithPassword({ email: email.trim().toLowerCase(), password })
-      .catch(() => ({ error: { code: 'network' } }))
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password }).catch(() => ({ error: { code: 'network' } }))
     setSubmitting(false)
     if (error) {
       setFailed(error.code === 'email_not_confirmed' ? 'unconfirmed' : error.code === 'network' ? 'network' : 'credentials')
@@ -51,9 +52,7 @@ export function SignInPage() {
       <OnboardingHeader title="Sign in to Synqop" />
 
       {routeState?.confirmEmail && !failed && (
-        <AlertBanner title="Confirm your email">
-          We sent a link to {routeState.confirmEmail}. Open it to confirm your account, then sign in.
-        </AlertBanner>
+        <AlertBanner title="Confirm your email">We sent a link to {routeState.confirmEmail}. Open it to confirm your account, then sign in.</AlertBanner>
       )}
       {failed === 'unconfirmed' && (
         <AlertBanner tone="warning" title="Confirm your email first">

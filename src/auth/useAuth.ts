@@ -23,7 +23,7 @@ export interface Me {
 }
 
 /** Why a signed-in account can't use the app (API error codes from /v1/me). */
-export type NoAccessReason = 'no_organisation' | 'access_ended' | 'unknown'
+export type NoAccessReason = 'no_organisation' | 'access_ended' | 'mfa_required' | 'unknown'
 
 export type AuthState =
   | { status: 'loading' }
@@ -31,7 +31,7 @@ export type AuthState =
   | { status: 'signed-out'; expired?: boolean }
   /**
    * Signed in to Supabase, but no active membership: `no_organisation` → resume organisation set-up (R1.03a);
-   * `access_ended` → deactivated (P1.04w).
+   * `access_ended` → deactivated (P1.04w). `mfa_required` → enter the two-step sign-in code.
    */
   | { status: 'no-access'; reason: NoAccessReason; session: Session }
   | { status: 'signed-in'; session: Session; me: Me }

@@ -10,6 +10,7 @@ import { PageHeader, Panel, PanelHeader } from '@/components/ui/Page'
 import { TextAreaField, TextField } from '@/components/ui/TextField'
 import { api, ApiError } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
+import { checkPassword } from '@/lib/password-check'
 import { useNotificationPreferences, type NotificationPreference } from '@/pages/participant/data'
 
 type Errors = Partial<Record<'fullName' | 'phone' | 'bio' | 'current' | 'next' | 'confirm', string>>
@@ -112,9 +113,8 @@ function SettingsForm({ area, initialPrefs }: { area: Area; initialPrefs: Notifi
         done.push('notifications')
       }
       if (passwordStarted) {
-        // Check the current password by signing in with it, then set the new one.
-        const check = await supabase.auth.signInWithPassword({ email, password: current })
-        if (check.error) {
+        // Check the current password (without replacing this session), then set the new one.
+        if (!(await checkPassword(email, current))) {
           setErrors({ current: 'That isn’t your current password.' })
           throw new Error('password')
         }

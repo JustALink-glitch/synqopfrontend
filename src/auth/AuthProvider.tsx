@@ -5,6 +5,15 @@ import { api, ApiError, onSessionExpired } from '@/lib/api'
 import { hadStoredSession, supabase } from '@/lib/supabase'
 import { AuthContext, type AuthContextValue, type AuthState, type Me, type NoAccessReason } from './useAuth'
 
+/** 'aal2' once this session has passed two-step sign-in. */
+function aalOf(session: Session | null | undefined) {
+  try {
+    return session ? ((JSON.parse(atob(session.access_token.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/'))) as { aal?: string }).aal ?? 'aal1') : null
+  } catch {
+    return 'aal1'
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const [session, setSession] = useState<Session | null | undefined>(undefined)
@@ -38,11 +47,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient])
 
   const me = useQuery({
-    queryKey: ['me', session?.user.id],
+    // The token changes level after the two-step code, so include it: /v1/me is asked again.
+    queryKey: ['me', session?.user.id, aalOf(session)],
     queryFn: ({ signal }) => api<Me>('/v1/me', { signal }),
     enabled: Boolean(session),
     staleTime: 5 * 60 * 1000,
     retry: false,
+    // Same person, new token level (after the two-step code): keep showing the app while /v1/me reloads.
+    placeholderData: (previous, previousQuery) => (previousQuery?.queryKey[1] === session?.user.id ? previous : undefined),
   })
 
   const value = useMemo<AuthContextValue>(() => {
@@ -51,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     else if (session === null) state = { status: 'signed-out', expired }
     else if (me.isError) {
       const code = me.error instanceof ApiError ? me.error.code : ''
-      const reason: NoAccessReason = code === 'no_organisation' || code === 'access_ended' ? code : 'unknown'
+      const reason: NoAccessReason = code === 'no_organisation' || code === 'access_ended' || code === 'mfa_required' ? code : 'unknown'
       state = { status: 'no-access', reason, session }
     } else if (!me.data) state = { status: 'loading' }
     else state = { status: 'signed-in', session, me: me.data }

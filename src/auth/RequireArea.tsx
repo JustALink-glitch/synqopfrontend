@@ -22,6 +22,9 @@ export function RequireArea({ area, children }: { area: Area; children: ReactNod
     // Signed up but never finished set-up: resume at the organisation step (R1.03a).
     return <Navigate to="/signup/organisation" replace />
   }
+  if (state.status === 'no-access' && state.reason === 'mfa_required') {
+    return <Navigate to="/sign-in/code" replace state={{ from: location.pathname + location.search }} />
+  }
   if (state.status === 'no-access') {
     return (
       <StatePanel

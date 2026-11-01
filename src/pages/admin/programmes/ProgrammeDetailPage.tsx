@@ -41,7 +41,11 @@ export function ProgrammeDetailPage() {
       <>
         <PageHeader title={missing ? 'Programme not found' : 'Couldn’t load this programme'} breadcrumb={[{ label: 'Programmes', to: '/admin/programmes' }]} />
         <Panel>
-          <StatePanel kind={missing ? 'no-results' : 'error'} title={missing ? 'This programme doesn’t exist' : 'Something went wrong'} description={missing ? undefined : 'Check your connection and try again.'} />
+          <StatePanel
+            kind={missing ? 'no-results' : 'error'}
+            title={missing ? 'This programme doesn’t exist' : 'Something went wrong'}
+            description={missing ? undefined : 'Check your connection and try again.'}
+          />
         </Panel>
       </>
     )
@@ -106,7 +110,12 @@ export function ProgrammeDetailPage() {
       <Metrics
         items={[
           { label: 'Cohorts', icon: <CalendarIcon size={18} />, value: programme.cohorts.total, context: breakdown || 'None yet' },
-          { label: 'Participants', icon: <UserGroupIcon size={18} />, value: programme.participants, context: programme.participants ? 'Across this programme’s cohorts' : 'None enrolled yet' },
+          {
+            label: 'Participants',
+            icon: <UserGroupIcon size={18} />,
+            value: programme.participants,
+            context: programme.participants ? 'Across this programme’s cohorts' : 'None enrolled yet',
+          },
           {
             label: 'Attendance, last 4 weeks',
             icon: <ChartIcon size={18} />,
@@ -135,7 +144,11 @@ export function ProgrammeDetailPage() {
               <EmptyState
                 icon={<CalendarIcon size={24} />}
                 title="No cohorts yet"
-                body={courses.length === 0 ? 'Add courses first, then create a cohort to run them between a start and end date.' : 'A cohort runs this programme’s courses between a start and end date.'}
+                body={
+                  courses.length === 0
+                    ? 'Add courses first, then create a cohort to run them between a start and end date.'
+                    : 'A cohort runs this programme’s courses between a start and end date.'
+                }
                 actions={
                   !archived && (
                     <Button icon={<PlusIcon size={16} />} onClick={() => navigate(`/admin/cohorts/new?programme=${programme.id}`)}>
@@ -180,7 +193,10 @@ export function ProgrammeDetailPage() {
                 <PanelHeader id="courses-title" title="Courses" description="Shared by every cohort in this programme." />
               </div>
               {!archived && courses.length > 0 && (
-                <Link to={`/admin/courses/new?programme=${programme.id}`} className="inline-flex items-center gap-1 text-caption-strong text-brand-text hover:underline">
+                <Link
+                  to={`/admin/courses/new?programme=${programme.id}`}
+                  className="inline-flex items-center gap-1 text-caption-strong text-brand-text hover:underline"
+                >
                   <PlusIcon size={14} />
                   Add course
                 </Link>
@@ -206,7 +222,10 @@ export function ProgrammeDetailPage() {
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="truncate text-body-strong text-primary">{course.name}</span>
                       <span className="truncate text-caption text-secondary">
-                        {[course.defaultLead?.name ?? 'No lead trainer yet', course.plannedSessions != null && `${plural(course.plannedSessions, 'session')} per cohort`]
+                        {[
+                          course.defaultLead?.name ?? 'No lead trainer yet',
+                          course.plannedSessions != null && `${plural(course.plannedSessions, 'session')} per cohort`,
+                        ]
                           .filter(Boolean)
                           .join(' · ')}
                       </span>
@@ -239,7 +258,11 @@ function CohortRow({ cohort }: { cohort: CohortSummary }) {
       <Cell>
         <Stacked
           primary={
-            <Link to={`/admin/cohorts/${cohort.id}`} onClick={(e) => e.stopPropagation()} className="hover:underline focus-visible:underline focus-visible:outline-none">
+            <Link
+              to={`/admin/cohorts/${cohort.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="hover:underline focus-visible:underline focus-visible:outline-none"
+            >
               {cohort.name}
             </Link>
           }

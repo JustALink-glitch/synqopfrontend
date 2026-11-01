@@ -185,7 +185,14 @@ export function ImportParticipantsPage() {
                     <p className="text-caption text-secondary">Up to {MAX_ROWS} rows. Columns: full_name, email, phone (optional).</p>
                   </>
                 )}
-                <input ref={input} type="file" accept=".csv,text/csv" className="sr-only" aria-label="CSV file" onChange={(e) => void readFile(e.target.files?.[0])} />
+                <input
+                  ref={input}
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="sr-only"
+                  aria-label="CSV file"
+                  onChange={(e) => void readFile(e.target.files?.[0])}
+                />
               </div>
               {fileError && <p className="text-caption text-error-fg">{fileError}</p>}
               <Checkbox label="Email invitations when the import finishes" checked={sendEmails} onChange={(e) => setSendEmails(e.target.checked)} />
@@ -286,7 +293,10 @@ export function ImportParticipantsPage() {
                     onClick={() =>
                       download(
                         `skipped-${file.name}`,
-                        ['full_name,email,phone,problem', ...result.skipped.map((r) => [r.fullName, r.email, r.phone ?? '', r.message ?? ''].map(csvCell).join(','))].join('\n'),
+                        [
+                          'full_name,email,phone,problem',
+                          ...result.skipped.map((r) => [r.fullName, r.email, r.phone ?? '', r.message ?? ''].map(csvCell).join(',')),
+                        ].join('\n'),
                       )
                     }
                   >
@@ -357,12 +367,7 @@ function Steps({ current }: { current: Step }) {
   )
 }
 
-const reviewColumns: Column[] = [
-  { label: 'Row', width: 64 },
-  { label: 'Full name' },
-  { label: 'Email' },
-  { label: 'Check', width: 220 },
-]
+const reviewColumns: Column[] = [{ label: 'Row', width: 64 }, { label: 'Full name' }, { label: 'Email' }, { label: 'Check', width: 220 }]
 
 function ReviewTable({ rows }: { rows: ReviewedRow[] }) {
   if (rows.length === 0) return <p className="py-6 text-center text-body text-secondary">No rows here.</p>

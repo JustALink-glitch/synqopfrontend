@@ -69,7 +69,10 @@ export const useInterventions = () =>
   useQuery({
     queryKey: [...keys.all, 'interventions'],
     queryFn: ({ signal }) =>
-      api<{ timeZone: string; interventions: (InterventionEntry & { participant: { id: string; name: string }; cohort: string })[] }>('/v1/attention/interventions', { signal }),
+      api<{ timeZone: string; interventions: (InterventionEntry & { participant: { id: string; name: string }; cohort: string })[] }>(
+        '/v1/attention/interventions',
+        { signal },
+      ),
   })
 
 export const useParticipantAttention = (memberId: string, enabled = true) =>
@@ -95,7 +98,9 @@ export interface InterventionInput {
 }
 
 export const useRecordIntervention = (memberId: string) =>
-  useAttentionMutation((input: InterventionInput) => api<{ intervention: { id: string } }>(`/v1/attention/participants/${memberId}/interventions`, { method: 'POST', body: input }))
+  useAttentionMutation((input: InterventionInput) =>
+    api<{ intervention: { id: string } }>(`/v1/attention/participants/${memberId}/interventions`, { method: 'POST', body: input }),
+  )
 
 export const useResolveFlags = (memberId: string) =>
   useAttentionMutation((note: string) => api<{ resolved: number }>(`/v1/attention/participants/${memberId}/resolve`, { method: 'POST', body: { note } }))
@@ -119,8 +124,16 @@ export const ruleLabel: Record<Rule, string> = {
 
 export const methodLabel: Record<Method, string> = { call: 'Phone call', email: 'Email', message: 'Message', visit: 'In person', other: 'Other' }
 const methodPast: Record<Method, string> = { call: 'Called', email: 'Emailed', message: 'Messaged', visit: 'Met', other: 'Contacted' }
-export const outcomeLabel: Record<Outcome, string> = { awaiting_response: 'Awaiting response', reached: 'Reached', resolved: 'Resolved', no_response: 'No response' }
-export const outcomeTone = { awaiting_response: 'neutral', reached: 'info', resolved: 'success', no_response: 'warning' } as const satisfies Record<Outcome, string>
+export const outcomeLabel: Record<Outcome, string> = {
+  awaiting_response: 'Awaiting response',
+  reached: 'Reached',
+  resolved: 'Resolved',
+  no_response: 'No response',
+}
+export const outcomeTone = { awaiting_response: 'neutral', reached: 'info', resolved: 'success', no_response: 'warning' } as const satisfies Record<
+  Outcome,
+  string
+>
 
 const num = (v: unknown) => (typeof v === 'number' ? v : Number(v ?? 0))
 const days = (v: unknown, timeZone?: string) => (Array.isArray(v) ? (v as string[]).map((d) => formatDay(d, timeZone)) : [])
@@ -131,7 +144,10 @@ export function describeFlag(f: Flag, timeZone?: string): { title: string; detai
   const d = f.details
   switch (f.rule) {
     case 'low_attendance':
-      return { title: `Attendance ${num(d.attendancePct)}%`, detail: `${num(d.present)} of ${plural(num(d.recorded), 'session')} · below the ${num(d.threshold)}% threshold` }
+      return {
+        title: `Attendance ${num(d.attendancePct)}%`,
+        detail: `${num(d.present)} of ${plural(num(d.recorded), 'session')} · below the ${num(d.threshold)}% threshold`,
+      }
     case 'missed_in_row':
       return {
         title: `Missed ${num(d.missed)} sessions in a row`,
@@ -140,9 +156,15 @@ export function describeFlag(f: Flag, timeZone?: string): { title: string; detai
     case 'overdue_assignments':
       return { title: `${plural(num(d.count), 'assignment')} overdue`, detail: list((d.titles as string[] | undefined) ?? []) }
     case 'inactive':
-      return { title: `No activity for ${num(d.days)} days`, detail: d.lastSignInAt ? `Last signed in ${formatDay(String(d.lastSignInAt), timeZone)}` : 'Hasn’t signed in yet' }
+      return {
+        title: `No activity for ${num(d.days)} days`,
+        detail: d.lastSignInAt ? `Last signed in ${formatDay(String(d.lastSignInAt), timeZone)}` : 'Hasn’t signed in yet',
+      }
     case 'low_grade':
-      return { title: `Average grade ${num(d.averagePct)}%`, detail: `Across ${plural(num(d.graded), 'graded assignment')} · below the ${num(d.threshold)}% threshold` }
+      return {
+        title: `Average grade ${num(d.averagePct)}%`,
+        detail: `Across ${plural(num(d.graded), 'graded assignment')} · below the ${num(d.threshold)}% threshold`,
+      }
   }
 }
 

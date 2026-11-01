@@ -76,6 +76,7 @@ import { ResetPasswordPage } from '@/pages/onboarding/ResetPasswordPage'
 import { SignUpPage } from '@/pages/onboarding/SignUpPage'
 import { WorkspaceReadyPage } from '@/pages/onboarding/WorkspaceReadyPage'
 import { SignInPage } from '@/pages/SignInPage'
+import { TwoStepCodePage } from '@/pages/onboarding/TwoStepCodePage'
 import { navigation } from './navigation'
 
 /** Screens that are built; everything else in the sidebar shows a placeholder. */
@@ -239,6 +240,7 @@ function areaRoutes(area: Area): RouteObject {
 export const routes: RouteObject[] = [
   { path: '/', element: <Navigate to="/sign-in" replace /> },
   { path: '/sign-in', element: <SignInPage /> },
+  { path: '/sign-in/code', element: <TwoStepCodePage /> },
   // Admin sign-up (R1)
   { path: '/signup', element: <SignUpPage /> },
   { path: '/signup/organisation', element: <OrganisationPage /> },

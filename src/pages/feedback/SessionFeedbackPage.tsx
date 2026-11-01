@@ -39,7 +39,11 @@ export function SessionFeedbackPage({ area }: { area: Area }) {
       <>
         <PageHeader title="Participant feedback" breadcrumb={[root]} />
         <Panel>
-          <StatePanel kind={notFound ? 'no-results' : 'error'} title={notFound ? 'Session not found' : 'Couldn’t load the feedback'} description={notFound ? 'It may not be one of your sessions.' : 'Check your connection and try again.'} />
+          <StatePanel
+            kind={notFound ? 'no-results' : 'error'}
+            title={notFound ? 'Session not found' : 'Couldn’t load the feedback'}
+            description={notFound ? 'It may not be one of your sessions.' : 'Check your connection and try again.'}
+          />
         </Panel>
       </>
     )
@@ -66,7 +70,10 @@ export function SessionFeedbackPage({ area }: { area: Area }) {
       <PageHeader
         breadcrumb={[root, { label: `${d.session.course} · ${dayLabel}`, to: `${sessionsBase}/${d.session.id}` }, { label: 'Feedback' }]}
         title="Participant feedback"
-        description={[d.session.course, d.session.cohort, d.session.number ? `Session ${d.session.number}` : null, dayLabel].filter(Boolean).join(' · ') + (area === 'admin' ? '. Feedback is optional for participants.' : '. Anonymous — only you and admins see it.')}
+        description={
+          [d.session.course, d.session.cohort, d.session.number ? `Session ${d.session.number}` : null, dayLabel].filter(Boolean).join(' · ') +
+          (area === 'admin' ? '. Feedback is optional for participants.' : '. Anonymous — only you and admins see it.')
+        }
         actions={
           d.responses > 0 ? (
             <Button variant="secondary" icon={<DownloadIcon size={16} />} onClick={exportCsv}>
@@ -80,7 +87,11 @@ export function SessionFeedbackPage({ area }: { area: Area }) {
           <EmptyState
             icon={<FileIcon size={24} />}
             title="No responses yet"
-            body={d.session.status === 'held' ? 'Participants can leave feedback from the session page. Results appear here as they come in.' : 'Participants can leave feedback once the session ends. Results appear here as they come in.'}
+            body={
+              d.session.status === 'held'
+                ? 'Participants can leave feedback from the session page. Results appear here as they come in.'
+                : 'Participants can leave feedback once the session ends. Results appear here as they come in.'
+            }
           />
         </Panel>
       ) : (

@@ -8,7 +8,9 @@ import { api, ApiError } from '@/lib/api'
 import { formatDay, formatTime } from '@/lib/format'
 import { initials, roleLabel, shortName } from '@/lib/people'
 import { supabase } from '@/lib/supabase'
+import { checkPassword } from '@/lib/password-check'
 import { SaveBar } from './SettingsBits'
+import { TwoStepPanel } from './TwoStepPanel'
 import { SettingsTitle } from './SettingsLayout'
 import type { Notice } from './settingsForm'
 
@@ -79,9 +81,8 @@ export function ProfileSettingsPage() {
         done.push('profile')
       }
       if (passwordStarted) {
-        // Check the current password by signing in with it, then set the new one.
-        const check = await supabase.auth.signInWithPassword({ email, password: current })
-        if (check.error) {
+        // Check the current password (without replacing this session), then set the new one.
+        if (!(await checkPassword(email, current))) {
           setErrors({ current: 'That isn’t your current password.' })
           throw new Error('password')
         }
@@ -191,6 +192,8 @@ export function ProfileSettingsPage() {
             />
           </div>
         </Panel>
+
+        {me && (me.membership.role === 'owner' || me.membership.role === 'admin') && <TwoStepPanel />}
 
         <Panel aria-labelledby="signin-title" className="gap-0">
           <PanelHeader id="signin-title" title="Sign-in" />

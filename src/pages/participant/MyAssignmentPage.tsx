@@ -29,7 +29,11 @@ export function MyAssignmentPage() {
       <>
         <PageHeader title={notFound ? 'Assignment not found' : 'Couldn’t load the assignment'} breadcrumb={[{ label: 'Assignments', to: BASE }]} />
         <Panel>
-          <StatePanel kind={notFound ? 'no-results' : 'error'} title={notFound ? 'It isn’t in your courses.' : 'Something went wrong'} description="Go back to your assignments." />
+          <StatePanel
+            kind={notFound ? 'no-results' : 'error'}
+            title={notFound ? 'It isn’t in your courses.' : 'Something went wrong'}
+            description="Go back to your assignments."
+          />
         </Panel>
       </>
     )
@@ -91,7 +95,13 @@ function MyAssignmentView({ timeZone, assignment: a, submission: s }: { timeZone
                 <FileRow key={f.id} name={f.name} size={f.size} onDownload={() => downloadFile(`/v1/my/assignments/${a.id}/files/${f.id}`)} />
               ))}
               {a.links.map((l) => (
-                <a key={l.url} href={l.url} target="_blank" rel="noreferrer" className="inline-flex w-fit max-w-full items-center gap-1 text-caption-strong text-brand-text hover:underline">
+                <a
+                  key={l.url}
+                  href={l.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex w-fit max-w-full items-center gap-1 text-caption-strong text-brand-text hover:underline"
+                >
                   <span className="truncate">{l.name}</span>
                   <ChevronRightIcon size={14} className="shrink-0" />
                 </a>
@@ -211,7 +221,8 @@ function SubmitForm({
     event.preventDefault()
     setFailed(null)
     if (type === 'file' && !file) return setError('Choose a file to submit.')
-    if (type === 'link' && !/^https?:\/\/\S+$/.test(link.trim())) return setError(link.trim() ? 'Paste the full link, starting with https://' : 'Paste a link to your work.')
+    if (type === 'link' && !/^https?:\/\/\S+$/.test(link.trim()))
+      return setError(link.trim() ? 'Paste the full link, starting with https://' : 'Paste a link to your work.')
     if (type === 'text' && !text.trim()) return setError('Write your answer.')
     try {
       if (type === 'file') {
@@ -237,7 +248,11 @@ function SubmitForm({
   return (
     <Panel aria-labelledby="submit-title">
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-        <PanelHeader id="submit-title" title={replacing ? 'Replace your submission' : 'Your submission'} description={pastDue ? 'It’ll be marked late.' : 'You can replace it until the due time.'} />
+        <PanelHeader
+          id="submit-title"
+          title={replacing ? 'Replace your submission' : 'Your submission'}
+          description={pastDue ? 'It’ll be marked late.' : 'You can replace it until the due time.'}
+        />
         {failed && (
           <AlertBanner tone="error" title="Couldn’t submit">
             {failed}
@@ -325,7 +340,14 @@ function SubmitForm({
           />
         )}
         {type === 'file' && error && <p className="text-caption text-error-fg">{error}</p>}
-        <TextAreaField label="Note for your trainer" optional value={note} maxLength={1000} placeholder="Anything they should know" onChange={(e) => setNote(e.target.value)} />
+        <TextAreaField
+          label="Note for your trainer"
+          optional
+          value={note}
+          maxLength={1000}
+          placeholder="Anything they should know"
+          onChange={(e) => setNote(e.target.value)}
+        />
         <div className="flex justify-end gap-3 max-md:flex-col-reverse max-md:[&>*]:h-11">
           {onCancel && (
             <Button variant="secondary" onClick={onCancel} disabled={busy}>

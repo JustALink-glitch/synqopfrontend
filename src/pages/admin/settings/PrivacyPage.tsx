@@ -10,7 +10,7 @@ import { Cell, Row, Stacked, Table } from '@/components/ui/Table'
 import { TextField } from '@/components/ui/TextField'
 import { ApiError, downloadApiFile } from '@/lib/api'
 import { formatDay, formatDayWithYear, formatTime } from '@/lib/format'
-import { supabase } from '@/lib/supabase'
+import { checkPassword } from '@/lib/password-check'
 import { useDeletion, usePrivacy, useRequestExport, type DataExport, type ExportPart, type PrivacyView } from './data'
 import { SettingsLoader } from './SettingsBits'
 import { SettingsTitle } from './SettingsLayout'
@@ -268,8 +268,7 @@ function DeleteDialog({ view, onClose, onDone }: { view: PrivacyView; onClose: (
     setChecking(true)
     try {
       // We ask for the password again because this can't be undone after 30 days.
-      const check = await supabase.auth.signInWithPassword({ email, password })
-      if (check.error) return setErrors({ password: 'That isn’t your password.' })
+      if (!(await checkPassword(email, password))) return setErrors({ password: 'That isn’t your password.' })
       await schedule.mutateAsync({ confirmName: name.trim() })
       await refresh()
       onDone()

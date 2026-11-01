@@ -20,7 +20,10 @@ const columns: Column[] = [
 
 const TODO: MyStatus[] = ['not_submitted', 'overdue']
 const matches = (f: Filter, a: MyAssignment) =>
-  f === 'all' || (f === 'todo' && TODO.includes(a.status)) || (f === 'submitted' && (a.status === 'submitted' || a.status === 'late')) || (f === 'graded' && a.status === 'graded')
+  f === 'all' ||
+  (f === 'todo' && TODO.includes(a.status)) ||
+  (f === 'submitted' && (a.status === 'submitted' || a.status === 'late')) ||
+  (f === 'graded' && a.status === 'graded')
 
 export function MyStatusBadge({ status }: { status: MyStatus }) {
   return <Badge tone={myStatusTone[status]}>{myStatusLabel[status]}</Badge>
@@ -58,7 +61,12 @@ export function MyAssignmentsPage() {
         </Panel>
       ) : query.isError ? (
         <Panel>
-          <StatePanel kind="error" title="Couldn’t load your assignments" description="Check your connection and try again." action={{ label: 'Try again', onClick: () => void query.refetch() }} />
+          <StatePanel
+            kind="error"
+            title="Couldn’t load your assignments"
+            description="Check your connection and try again."
+            action={{ label: 'Try again', onClick: () => void query.refetch() }}
+          />
         </Panel>
       ) : all.length === 0 ? (
         <Panel className="py-12">
@@ -83,7 +91,11 @@ export function MyAssignmentsPage() {
           />
           <Panel className="gap-0 max-md:py-2">
             {visible.length === 0 ? (
-              <StatePanel kind="no-results" title={filter === 'todo' ? 'Nothing to do right now' : 'Nothing here'} description={filter === 'todo' ? 'You’re up to date.' : 'Try another filter.'} />
+              <StatePanel
+                kind="no-results"
+                title={filter === 'todo' ? 'Nothing to do right now' : 'Nothing here'}
+                description={filter === 'todo' ? 'You’re up to date.' : 'Try another filter.'}
+              />
             ) : (
               <>
                 <div className="max-md:hidden">
@@ -101,7 +113,11 @@ export function MyAssignmentsPage() {
                           </Cell>
                           <Cell className="tabular-nums">{gradeCell(a) ?? <span className="text-muted">—</span>}</Cell>
                           <Cell align="right">
-                            <Link to={a.id} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-caption-strong text-brand-text hover:underline">
+                            <Link
+                              to={a.id}
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 text-caption-strong text-brand-text hover:underline"
+                            >
                               {submit ? 'Submit' : 'View'}
                               <ChevronRightIcon size={14} />
                             </Link>

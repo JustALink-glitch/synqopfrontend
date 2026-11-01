@@ -213,7 +213,14 @@ function CohortForm({
               />
               <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
                 <TextField label="Start date" type="date" value={form.startsOn} onChange={(e) => set('startsOn', e.target.value)} error={errors.startsOn} />
-                <TextField label="End date" type="date" min={form.startsOn || undefined} value={form.endsOn} onChange={(e) => set('endsOn', e.target.value)} error={errors.endsOn} />
+                <TextField
+                  label="End date"
+                  type="date"
+                  min={form.startsOn || undefined}
+                  value={form.endsOn}
+                  onChange={(e) => set('endsOn', e.target.value)}
+                  error={errors.endsOn}
+                />
               </div>
             </FormSection>
 
