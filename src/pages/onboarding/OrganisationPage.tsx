@@ -97,13 +97,7 @@ export function OrganisationPage() {
             error={errors.organisationName}
           />
           {!savedName && (
-            <TextField
-              label="Your full name"
-              autoComplete="name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              error={errors.fullName}
-            />
+            <TextField label="Your full name" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} error={errors.fullName} />
           )}
           <SelectField
             label="Time zone"

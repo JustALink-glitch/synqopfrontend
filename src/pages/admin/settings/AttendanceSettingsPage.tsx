@@ -1,8 +1,8 @@
-import type { FormEvent } from 'react'
+import { useEffect, useRef, type FormEvent } from 'react'
 import { AlertBanner } from '@/components/ui/AlertBanner'
 import { useSearchParams } from 'react-router'
 import { Panel, PanelHeader } from '@/components/ui/Page'
-import { useAttendanceSettings, useSaveAttendanceSettings, type AttendanceSettings } from './data'
+import { useAttendanceSettings, useCompleteZoom, useSaveAttendanceSettings, type AttendanceSettings } from './data'
 import { NumberBox, RadioList, SaveBar, SettingRow, SettingsLoader, SettingsSection } from './SettingsBits'
 import { SettingsTitle } from './SettingsLayout'
 import { useSettingsForm } from './settingsForm'
@@ -39,9 +39,18 @@ function AttendanceForm({ settings }: { settings: AttendanceSettings }) {
   const save = useSaveAttendanceSettings()
   const form = useSettingsForm(toDraft(settings))
   const { draft, set, errors } = form
-  // Back from Zoom's approval screen.
-  const [params] = useSearchParams()
+  // Back from Zoom's approval screen: finish connecting as the signed-in admin, then show the result.
+  const [params, setParams] = useSearchParams()
   const back = zoomResults[params.get('zoom') ?? '']
+  const complete = useCompleteZoom()
+  const finishing = useRef(false)
+  useEffect(() => {
+    const code = params.get('code')
+    const state = params.get('state')
+    if (params.get('zoom') !== 'finish' || !code || !state || finishing.current) return
+    finishing.current = true
+    complete.mutate({ code, state }, { onSettled: (_data, error) => setParams({ zoom: error ? 'error' : 'connected' }, { replace: true }) })
+  }, [params, setParams, complete])
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()

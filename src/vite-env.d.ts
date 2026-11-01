@@ -4,6 +4,8 @@ interface ImportMetaEnv {
   readonly VITE_API_URL?: string
   readonly VITE_SUPABASE_URL?: string
   readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string
+  /** Cloudflare Turnstile site key (bot check on sign-up and forgot password). Optional. */
+  readonly VITE_TURNSTILE_SITE_KEY?: string
 }
 
 interface ImportMeta {

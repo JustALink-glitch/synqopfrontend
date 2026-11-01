@@ -8,6 +8,7 @@ import { Prompt } from '@/components/ui/TextLink'
 import { formatTime } from '@/lib/format'
 import { initialUrl, supabase } from '@/lib/supabase'
 import { requestPasswordReset } from './passwordReset'
+import { useHumanCheck } from '@/components/ui/HumanCheck'
 import { MIN_PASSWORD_LENGTH } from './validation'
 
 const FOOTER = 'The same for admins, trainers and participants.'
@@ -149,16 +150,8 @@ function NewPasswordForm({ email, onDone }: { email: string | null; onDone: () =
 function PasswordUpdated({ email }: { email: string | null }) {
   const navigate = useNavigate()
   return (
-    <OnboardingLayout
-      panelTitle="You’re all set"
-      panelBody="If you didn’t make this change, contact your programme admin straight away."
-      footer={FOOTER}
-    >
-      <OnboardingHeader
-        compact
-        title="Password updated"
-        description="Sign in with your new password. You’ve been signed out on other devices."
-      />
+    <OnboardingLayout panelTitle="You’re all set" panelBody="If you didn’t make this change, contact your programme admin straight away." footer={FOOTER}>
+      <OnboardingHeader compact title="Password updated" description="Sign in with your new password. You’ve been signed out on other devices." />
       <Button size="lg" fullWidth onClick={() => navigate('/sign-in', { replace: true, state: { email } })}>
         Sign in
       </Button>
@@ -170,6 +163,7 @@ function LinkExpired({ sentAt, email }: { sentAt: string | null; email: string |
   const navigate = useNavigate()
   const [sending, setSending] = useState(false)
   const [failed, setFailed] = useState(false)
+  const human = useHumanCheck()
 
   const sent = sentAt && !Number.isNaN(Date.parse(sentAt)) ? new Date(sentAt) : null
   const detail = sent
@@ -184,9 +178,10 @@ function LinkExpired({ sentAt, email }: { sentAt: string | null; email: string |
     setSending(true)
     setFailed(false)
     try {
-      await requestPasswordReset(email)
+      await requestPasswordReset(email, human.token)
       navigate('/forgot-password', { replace: true, state: { sentTo: email } })
     } catch {
+      human.reset()
       setFailed(true)
       setSending(false)
     }
@@ -204,7 +199,8 @@ function LinkExpired({ sentAt, email }: { sentAt: string | null; email: string |
           Check your connection and try again.
         </AlertBanner>
       )}
-      <Button size="lg" fullWidth disabled={sending} onClick={sendNewLink}>
+      {human.widget}
+      <Button size="lg" fullWidth disabled={sending || !human.ready} onClick={sendNewLink}>
         {sending ? 'Sending…' : 'Send a new link'}
       </Button>
       <Prompt text="Remembered it?" to="/sign-in" label="Back to sign in" />

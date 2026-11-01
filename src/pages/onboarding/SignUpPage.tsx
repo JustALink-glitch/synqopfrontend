@@ -8,7 +8,8 @@ import { TextField } from '@/components/ui/TextField'
 import { Prompt, TextLink } from '@/components/ui/TextLink'
 import { useAuth } from '@/auth/useAuth'
 import { homePath } from '@/lib/roles'
-import { supabase } from '@/lib/supabase'
+import { api, ApiError } from '@/lib/api'
+import { humanCheckFailedMessage, useHumanCheck } from '@/components/ui/HumanCheck'
 import { validateEmail, validateFullName, validatePassword } from './validation'
 
 type Errors = Partial<Record<'fullName' | 'email' | 'password', string>>
@@ -24,6 +25,8 @@ export function SignUpPage() {
   const [emailInUse, setEmailInUse] = useState(false)
   const [networkError, setNetworkError] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [robot, setRobot] = useState(false)
+  const human = useHumanCheck()
 
   if (state.status === 'signed-in') return <Navigate to={homePath(state.me.membership.role)} replace />
   if (state.status === 'no-access' && state.reason === 'no_organisation') return <Navigate to="/signup/organisation" replace />
@@ -38,30 +41,27 @@ export function SignUpPage() {
     setErrors(next)
     setEmailInUse(false)
     setNetworkError(false)
+    setRobot(false)
     if (Object.values(next).some(Boolean)) return
 
     setSubmitting(true)
-    const { data, error } = await supabase.auth
-      .signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: {
-          data: { full_name: fullName.trim().replace(/\s+/g, ' ') },
-          emailRedirectTo: `${window.location.origin}/signup/organisation`,
-        },
+    const normalised = email.trim().toLowerCase()
+    try {
+      // Through the API, which runs the bot check and sends the Synqop confirmation email.
+      await api('/v1/auth/sign-up', {
+        method: 'POST',
+        body: { fullName: fullName.trim().replace(/\s+/g, ' '), email: normalised, password, captchaToken: human.token },
       })
-      .catch(() => ({ data: null, error: { code: 'network', message: '' } }))
-    setSubmitting(false)
-
-    if (error) {
-      if (error.code === 'user_already_exists' || error.code === 'email_exists') setEmailInUse(true)
-      else if (error.code === 'weak_password') setErrors({ password: 'Choose a stronger password.' })
+      navigate('/sign-in', { state: { confirmEmail: normalised } })
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'email_exists') setEmailInUse(true)
+      else if (e instanceof ApiError && e.code === 'weak_password') setErrors({ password: 'Choose a stronger password.' })
+      else if (e instanceof ApiError && e.code === 'captcha_failed') setRobot(true)
       else setNetworkError(true)
-      return
+    } finally {
+      human.reset()
+      setSubmitting(false)
     }
-    // With email confirmation on, there's no session yet: confirm, then sign in.
-    if (data?.session) navigate('/signup/organisation')
-    else navigate('/sign-in', { state: { confirmEmail: email.trim().toLowerCase() } })
   }
 
   return (
@@ -126,7 +126,9 @@ export function SignUpPage() {
             error={errors.password}
           />
         </div>
-        <Button type="submit" fullWidth disabled={submitting}>
+        {human.widget}
+        {(robot || human.failed) && <p className="-mt-3 text-caption text-error">{humanCheckFailedMessage}</p>}
+        <Button type="submit" fullWidth disabled={submitting || !human.ready}>
           {submitting ? 'Creating account…' : 'Create account'}
         </Button>
       </form>

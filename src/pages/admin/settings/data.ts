@@ -178,6 +178,14 @@ export function useDeletion() {
 /** F1.07 Starts Zoom's approval screen; Zoom sends the browser back to this page. */
 export const useConnectZoom = () => useMutation({ mutationFn: () => api<{ url: string }>('/v1/zoom/connect', { method: 'POST' }) })
 
+export function useCompleteZoom() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { code: string; state: string }) => api<{ connected: true; email: string }>('/v1/zoom/complete', { method: 'POST', body }),
+    onSuccess: () => client.invalidateQueries({ queryKey: [...keys.all, 'attendance'] }),
+  })
+}
+
 export function useDisconnectZoom() {
   const client = useQueryClient()
   return useMutation({

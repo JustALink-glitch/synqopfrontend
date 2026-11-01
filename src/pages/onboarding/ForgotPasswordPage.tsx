@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button'
 import { TextField } from '@/components/ui/TextField'
 import { Prompt, TextLink } from '@/components/ui/TextLink'
 import { requestPasswordReset } from './passwordReset'
+import { humanCheckFailedMessage, useHumanCheck } from '@/components/ui/HumanCheck'
+import { ApiError } from '@/lib/api'
 
 const PANEL = {
   panelTitle: 'Reset your password',
@@ -25,6 +27,7 @@ export function ForgotPasswordPage() {
   const [failed, setFailed] = useState(false)
   const [sending, setSending] = useState(false)
   const [sentTo, setSentTo] = useState<string | null>(routeState?.sentTo ?? null)
+  const human = useHumanCheck()
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -36,11 +39,13 @@ export function ForgotPasswordPage() {
     setFailed(false)
     setSending(true)
     try {
-      await requestPasswordReset(email)
+      await requestPasswordReset(email, human.token)
       setSentTo(email.trim().toLowerCase())
-    } catch {
-      setFailed(true)
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'captcha_failed') setError(humanCheckFailedMessage)
+      else setFailed(true)
     } finally {
+      human.reset()
       setSending(false)
     }
   }
@@ -68,7 +73,9 @@ export function ForgotPasswordPage() {
           }}
           error={error}
         />
-        <Button type="submit" size="lg" fullWidth disabled={sending}>
+        {human.widget}
+        {human.failed && <p className="-mt-3 text-caption text-error">{humanCheckFailedMessage}</p>}
+        <Button type="submit" size="lg" fullWidth disabled={sending || !human.ready}>
           {sending ? 'Sending…' : 'Send reset link'}
         </Button>
       </form>
@@ -82,6 +89,7 @@ function CheckYourEmail({ email }: { email: string }) {
   const [secondsLeft, setSecondsLeft] = useState(COOLDOWN_SECONDS)
   const [resending, setResending] = useState(false)
   const [resent, setResent] = useState(false)
+  const human = useHumanCheck()
 
   useEffect(() => {
     if (secondsLeft <= 0) return
@@ -92,10 +100,13 @@ function CheckYourEmail({ email }: { email: string }) {
   async function resend() {
     setResending(true)
     try {
-      await requestPasswordReset(email)
+      await requestPasswordReset(email, human.token)
       setResent(true)
       setSecondsLeft(COOLDOWN_SECONDS)
+    } catch {
+      // Same answer either way; the countdown simply doesn't restart.
     } finally {
+      human.reset()
       setResending(false)
     }
   }
@@ -105,19 +116,16 @@ function CheckYourEmail({ email }: { email: string }) {
 
   return (
     <OnboardingLayout {...PANEL}>
-      <OnboardingHeader
-        compact
-        title="Check your email"
-        description={`If an account uses ${email}, we’ve sent it a reset link. It expires in 1 hour.`}
-      />
+      <OnboardingHeader compact title="Check your email" description={`If an account uses ${email}, we’ve sent it a reset link. It expires in 1 hour.`} />
       <AlertBanner title="Nothing arrived?">
-        Check spam or promotions. Links come from no-reply@synqop.com. You can ask for another in a minute.
+        Check spam or promotions. Links come from notifications@mail.synqop.com. You can ask for another in a minute.
       </AlertBanner>
+      {human.widget}
       <Button
         variant="secondary"
         size="lg"
         fullWidth
-        disabled={waiting || resending}
+        disabled={waiting || resending || !human.ready}
         onClick={resend}
         className="disabled:border-transparent disabled:bg-surface-hover disabled:text-disabled disabled:opacity-100"
       >
