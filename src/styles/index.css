@@ -272,3 +272,15 @@
     justify-content: center;
   }
 }
+
+/*
+ * Phones and tablets: form fields use 16px text. iPhone Safari zooms into any field with smaller text when it's
+ * tapped, and often stays zoomed, which makes pages look cut off. Outside any layer, so it wins over text-body.
+ */
+@media (max-width: 1023px), (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
