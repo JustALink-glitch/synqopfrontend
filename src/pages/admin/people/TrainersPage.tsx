@@ -1,3 +1,4 @@
+import { CalendarDays, ClipboardCheck, Layers } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { StatePanel } from '@/components/StatePanel'
@@ -5,7 +6,7 @@ import { AlertBanner } from '@/components/ui/AlertBanner'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, UserIcon } from '@/components/ui/icons'
-import { EmptyState, FilterChips, PageHeader, Panel } from '@/components/ui/Page'
+import { Badge, EmptyState, FilterChips, PageHeader, Panel } from '@/components/ui/Page'
 import { SearchField } from '@/components/ui/SearchField'
 import { initials } from '@/lib/people'
 import { InviteTrainerDialog } from './InviteTrainerDialog'
@@ -14,7 +15,7 @@ import { StatusBadge } from './StatusBadge'
 import { useQueryClient } from '@tanstack/react-query'
 import { Download, Mail, UserX } from 'lucide-react'
 import { BulkBar, CardGrid, ItemCard, LayoutSwitch, RowActions } from '@/components/collection/Collection'
-import { useLayout } from '@/components/collection/layout'
+import { GRID_PANEL, useLayout } from '@/components/collection/layout'
 import { downloadCsv, runBulk, useSelection, type Selection } from '@/components/collection/selection'
 import { SelectBox } from '@/components/ui/Table'
 import { api, ApiError } from '@/lib/api'
@@ -227,7 +228,7 @@ export function TrainersPage() {
             ]}
           />
 
-          <Panel className="gap-0 py-4 max-md:py-2">
+          <Panel className={layout === 'grid' ? GRID_PANEL : 'gap-0 py-4 max-md:py-2'}>
             {visible.length === 0 ? (
               <StatePanel kind="no-results" title="No trainers match" description="Try another name or email, or clear the filter." />
             ) : layout === 'grid' ? (
@@ -237,18 +238,26 @@ export function TrainersPage() {
                     key={m.id}
                     to={m.id}
                     title={fullNameOf(m)}
-                    subtitle={m.email}
-                    leading={<Avatar size={40} initials={initials(m.firstName, m.lastName)} seed={m.id} />}
-                    badge={<StatusBadge member={m} />}
+                    description={
+                      m.teaching.cohorts.length
+                        ? `Teaches ${m.teaching.courses.map((c) => c.name).join(', ') || 'courses'} in ${m.teaching.cohorts.map((c) => c.name).join(', ')}`
+                        : `${m.email} · Not assigned yet`
+                    }
+                    leading={<Avatar size={24} initials={initials(m.firstName, m.lastName)} seed={m.id} />}
+                    badge={
+                      <>
+                        <StatusBadge member={m} />
+                        <Badge tone="neutral">{m.role === 'assistant_trainer' ? 'Assistant' : 'Lead trainer'}</Badge>
+                      </>
+                    }
                     select={{ checked: selection.has(m.id), onChange: () => selection.toggle(m.id) }}
+                    selecting={selection.count > 0}
                     actions={rowActions(m)}
-                    facts={[
-                      { label: 'Cohorts', value: m.teaching.cohorts.length || '—' },
-                      { label: 'Courses', value: m.teaching.courses.length || '—' },
-                      { label: 'Sessions this week', value: m.status === 'active' ? (m.sessionsThisWeek ?? 0) : '—' },
-                      { label: 'Role', value: m.role === 'assistant_trainer' ? 'Assistant' : 'Trainer' },
+                    meta={[
+                      { icon: <Layers />, text: plural(m.teaching.cohorts.length, 'cohort') },
+                      { icon: <ClipboardCheck />, text: plural(m.teaching.courses.length, 'course') },
+                      { icon: <CalendarDays />, text: m.status === 'active' ? `${m.sessionsThisWeek ?? 0} this week` : '—', label: 'Sessions this week' },
                     ]}
-                    footer={m.teaching.cohorts.length ? m.teaching.cohorts.map((c) => c.name).join(' · ') : 'Not assigned to a cohort yet'}
                   />
                 ))}
               </CardGrid>

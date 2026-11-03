@@ -1,3 +1,4 @@
+import { CalendarDays, ClipboardCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { StatePanel } from '@/components/StatePanel'
@@ -7,7 +8,7 @@ import { ChevronRightIcon, ClipboardIcon, PlusIcon } from '@/components/ui/icons
 import { Badge, EmptyState, FilterChips, PageHeader, Panel } from '@/components/ui/Page'
 import { Download } from 'lucide-react'
 import { BulkBar, CardGrid, ItemCard, LayoutSwitch } from '@/components/collection/Collection'
-import { useLayout } from '@/components/collection/layout'
+import { GRID_PANEL, useLayout } from '@/components/collection/layout'
 import { useSelection } from '@/components/collection/selection'
 import { assignmentsCsv } from './csv'
 import { Cell, Row, Stacked, Table, TableFooter, type Column } from '@/components/ui/Table'
@@ -150,7 +151,7 @@ export function TrainerAssignmentsPage() {
             noun={['assignment', 'assignments']}
             actions={[{ label: 'Export CSV', icon: <Download aria-hidden className="size-4" />, run: async () => assignmentsCsv(chosen, timeZone) }]}
           />
-          <Panel className="gap-0 max-md:py-2">
+          <Panel className={layout === 'grid' ? GRID_PANEL : 'gap-0 max-md:py-2'}>
             {visible.length === 0 ? (
               <StatePanel
                 kind="no-results"
@@ -158,7 +159,7 @@ export function TrainerAssignmentsPage() {
                 description={filter === 'grade' ? 'Every submission has a grade.' : 'Try another filter.'}
               />
             ) : layout === 'grid' ? (
-              <div className="py-2">
+              <div>
                 <CardGrid label="Assignments">
                   {paged.rows.map((a) => {
                     const next = action(a)
@@ -167,7 +168,8 @@ export function TrainerAssignmentsPage() {
                         key={a.id}
                         to={next.to}
                         title={a.title}
-                        subtitle={`${a.course.name} · ${a.cohort.name}`}
+                        description={`${a.course.name} · ${a.cohort.name}`}
+                        accent={a.counts.toGrade > 0 ? 'var(--chart-3)' : a.status === 'open' ? 'var(--chart-1)' : 'var(--chart-6)'}
                         badge={
                           <>
                             <Badge tone={a.status === 'open' ? 'info' : 'neutral'}>
@@ -177,14 +179,23 @@ export function TrainerAssignmentsPage() {
                           </>
                         }
                         select={{ checked: selection.has(a.id), onChange: () => selection.toggle(a.id) }}
-                        facts={[
-                          { label: 'Due', value: formatDay(a.dueAt, timeZone) },
-                          { label: 'Submitted', value: a.status === 'draft' ? 'Draft' : `${a.counts.submitted} of ${a.counts.expected}` },
-                          { label: 'To grade', value: a.status === 'draft' ? '—' : a.counts.toGrade },
-                          { label: 'Grading', value: a.scaleLabel },
+                        selecting={selection.count > 0}
+
+                        progress={{
+                          label: 'Handed in',
+                          value: a.counts.expected ? Math.round((a.counts.submitted / a.counts.expected) * 100) : null,
+                          text: a.status === 'draft' ? 'Draft' : `${a.counts.submitted} of ${a.counts.expected}`,
+                        }}
+                        people={a.setBy ? [{ id: a.setBy.id, name: a.setBy.name }] : undefined}
+                        meta={[
+                          { icon: <ClipboardCheck />, text: a.counts.submitted ? `${a.counts.graded} graded` : 'None graded', label: a.scaleLabel },
+                          { icon: <CalendarDays />, text: formatDay(a.dueAt, timeZone), label: 'Due' },
                         ]}
                         footer={
-                          <Link to={next.to} className="relative z-[1] inline-flex items-center gap-1 text-caption-strong text-brand-text hover:underline">
+                          <Link
+                            to={next.to}
+                            className="relative z-[1] ml-auto inline-flex items-center gap-1 text-caption-strong text-brand-text hover:underline"
+                          >
                             {next.label}
                             <ChevronRightIcon size={14} />
                           </Link>

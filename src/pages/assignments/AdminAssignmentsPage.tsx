@@ -1,3 +1,4 @@
+import { CalendarDays, ClipboardCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { StatePanel } from '@/components/StatePanel'
@@ -15,7 +16,7 @@ import { formatDue, useAssignments, type AssignmentSummary } from './data'
 import { Download } from 'lucide-react'
 import { Badge, EmptyState, FilterChips, Panel } from '@/components/ui/Page'
 import { BulkBar, CardGrid, ItemCard, LayoutSwitch, RowActions } from '@/components/collection/Collection'
-import { useLayout } from '@/components/collection/layout'
+import { GRID_PANEL, useLayout } from '@/components/collection/layout'
 import { useSelection } from '@/components/collection/selection'
 import { assignmentsCsv } from './csv'
 
@@ -139,18 +140,19 @@ export function AdminAssignmentsPage() {
             noun={['assignment', 'assignments']}
             actions={[{ label: 'Export CSV', icon: <Download aria-hidden className="size-4" />, run: async () => assignmentsCsv(chosen, timeZone) }]}
           />
-          <Panel className="gap-0 max-md:py-2">
+          <Panel className={layout === 'grid' ? GRID_PANEL : 'gap-0 max-md:py-2'}>
             {visible.length === 0 ? (
               <StatePanel kind="no-results" title="Nothing here" description="Try another filter." />
             ) : layout === 'grid' ? (
-              <div className="py-2">
+              <div>
                 <CardGrid label="Assignments">
                   {paged.rows.map((a) => (
                     <ItemCard
                       key={a.id}
                       to={`${BASE}/${a.id}`}
                       title={a.title}
-                      subtitle={`${a.course.name} · ${a.cohort.name}`}
+                      description={`${a.course.name} · ${a.cohort.name}`}
+                      accent={a.counts.toGrade > 0 ? 'var(--chart-3)' : a.status === 'open' ? 'var(--chart-1)' : 'var(--chart-6)'}
                       badge={
                         <>
                           <Badge tone={a.status === 'open' ? 'info' : 'neutral'}>
@@ -160,14 +162,18 @@ export function AdminAssignmentsPage() {
                         </>
                       }
                       select={{ checked: selection.has(a.id), onChange: () => selection.toggle(a.id) }}
+                      selecting={selection.count > 0}
                       actions={rowActions(a)}
-                      facts={[
-                        { label: 'Due', value: formatDue(a.dueAt, timeZone) },
-                        { label: 'Submitted', value: `${a.counts.submitted} of ${a.counts.expected}` },
-                        { label: 'Graded', value: a.counts.submitted ? a.counts.graded : '—' },
-                        { label: 'Grading', value: a.scaleLabel },
+                      progress={{
+                        label: 'Handed in',
+                        value: a.counts.expected ? Math.round((a.counts.submitted / a.counts.expected) * 100) : null,
+                        text: a.status === 'draft' ? 'Draft' : `${a.counts.submitted} of ${a.counts.expected}`,
+                      }}
+                      people={a.setBy ? [{ id: a.setBy.id, name: a.setBy.name }] : undefined}
+                      meta={[
+                        { icon: <ClipboardCheck />, text: a.counts.submitted ? `${a.counts.graded} graded` : 'None graded', label: a.scaleLabel },
+                        { icon: <CalendarDays />, text: formatDue(a.dueAt, timeZone), label: 'Due' },
                       ]}
-                      footer={a.setBy ? `Set by ${a.setBy.name}` : undefined}
                     />
                   ))}
                 </CardGrid>

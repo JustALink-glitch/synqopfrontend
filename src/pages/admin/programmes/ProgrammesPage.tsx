@@ -1,3 +1,4 @@
+import { ClipboardCheck, Layers, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { StatePanel } from '@/components/StatePanel'
@@ -15,7 +16,7 @@ import { useProgrammes, type Programme } from './data'
 import { coursesSummary } from './labels'
 import { Archive, ArchiveRestore, Download, Trash2 } from 'lucide-react'
 import { BulkBar, CardGrid, ItemCard, LayoutSwitch, RowActions } from '@/components/collection/Collection'
-import { useLayout } from '@/components/collection/layout'
+import { GRID_PANEL, useLayout } from '@/components/collection/layout'
 import { downloadCsv, runBulk, useSelection } from '@/components/collection/selection'
 import { api } from '@/lib/api'
 import { deleteForever, useRefreshStructure } from './data'
@@ -217,7 +218,7 @@ export function ProgrammesPage() {
             ]}
           />
 
-          <Panel className="gap-0 max-md:py-2">
+          <Panel className={layout === 'grid' ? GRID_PANEL : 'gap-0 max-md:py-2'}>
             {visible.length === 0 ? (
               term ? (
                 <div role="status" className="flex flex-col items-center gap-3 p-8 text-center">
@@ -236,22 +237,23 @@ export function ProgrammesPage() {
             ) : (
               <>
                 {layout === 'grid' ? (
-                  <div className="py-2">
+                  <div>
                     <CardGrid label="Programmes">
                       {paged.rows.map((p) => (
                         <ItemCard
                           key={p.id}
                           to={p.id}
                           title={p.name}
-                          subtitle={coursesSummary(p.courseNames)}
+                          description={p.description || coursesSummary(p.courseNames)}
                           badge={<ProgrammeStatusBadge status={p.status} />}
                           select={{ checked: selection.has(p.id), onChange: () => selection.toggle(p.id) }}
+                          selecting={selection.count > 0}
                           actions={rowActions(p)}
-                          facts={[
-                            { label: 'Cohorts', value: p.cohorts.total ? `${p.cohorts.total} · ${cohortBreakdown(p)}` : 'None' },
-                            { label: 'Participants', value: p.cohorts.total ? p.participants : '—' },
-                            { label: 'Attendance, 4 wks', value: <Percent value={p.attendance4w} /> },
-                            { label: 'Needs attention', value: p.needsAttention || '—' },
+                          progress={{ label: 'Attendance, 4 weeks', value: p.attendance4w }}
+                          meta={[
+                            { icon: <Layers />, text: p.cohorts.total ? plural(p.cohorts.total, 'cohort') : 'No cohorts', label: cohortBreakdown(p) },
+                            { icon: <Users />, text: plural(p.participants, 'participant') },
+                            ...(p.needsAttention ? [{ icon: <ClipboardCheck />, text: `${p.needsAttention} need attention` }] : []),
                           ]}
                         />
                       ))}

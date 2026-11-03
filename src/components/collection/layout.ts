@@ -24,3 +24,6 @@ export function useLayout(key: string): [Layout, (l: Layout) => void] {
     },
   ]
 }
+
+/** Grid view: cards sit on the page background, not inside a white panel (Flowdesk style). */
+export const GRID_PANEL = 'gap-3 !border-0 !bg-transparent !px-0 !py-0 !shadow-none'

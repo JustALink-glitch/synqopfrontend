@@ -1,3 +1,4 @@
+import { Clock } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { StatePanel } from '@/components/StatePanel'
@@ -14,7 +15,7 @@ import { initials } from '@/lib/people'
 import { CoursesHeader } from '@/pages/admin/sessions/CoursesHeader'
 import { Bell, Download } from 'lucide-react'
 import { BulkBar, CardGrid, ItemCard, LayoutSwitch } from '@/components/collection/Collection'
-import { useLayout } from '@/components/collection/layout'
+import { GRID_PANEL, useLayout } from '@/components/collection/layout'
 import { downloadCsv, runBulk, useSelection } from '@/components/collection/selection'
 import { useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '@/lib/api'
@@ -220,27 +221,27 @@ function ReportsBody({
             : []),
         ]}
       />
-      <Panel className="gap-0 max-md:py-2">
+      <Panel className={layout === 'grid' ? GRID_PANEL : 'gap-0 max-md:py-2'}>
         {visible.length === 0 ? (
           <p role="status" className="p-8 text-center text-body text-secondary">
             No reports here.
           </p>
         ) : layout === 'grid' ? (
-          <div className="py-2">
+          <div>
             <CardGrid label="Session reports">
               {paged.rows.map((r) => (
                 <ItemCard
                   key={r.sessionId}
                   to={paths.report(r.sessionId)}
                   title={r.course}
-                  subtitle={sessionLine(r, timeZone)}
+                  description={sessionLine(r, timeZone)}
+                  accent={r.state === 'overdue' ? 'var(--chart-5)' : r.state === 'due' ? 'var(--chart-3)' : 'var(--chart-6)'}
                   badge={<StateBadge row={r} />}
                   select={{ checked: selection.has(r.sessionId), onChange: () => selection.toggle(r.sessionId) }}
+                  selecting={selection.count > 0}
                   actions={<RowAction row={r} canWrite={data.canWrite} />}
-                  facts={[
-                    ...(!paths.trainer ? [{ label: 'Trainer', value: r.trainer?.name ?? 'No trainer' }] : []),
-                    { label: 'Due', value: `${formatDay(r.dueAt, timeZone)}, ${formatTime(r.dueAt, timeZone)}` },
-                  ]}
+                  people={!paths.trainer && r.trainer ? [{ id: r.trainer.id, name: r.trainer.name ?? 'Trainer' }] : undefined}
+                  meta={[{ icon: <Clock />, text: `Due ${formatDay(r.dueAt, timeZone)}, ${formatTime(r.dueAt, timeZone)}` }]}
                 />
               ))}
             </CardGrid>

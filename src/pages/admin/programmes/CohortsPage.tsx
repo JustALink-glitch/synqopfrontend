@@ -1,3 +1,4 @@
+import { CalendarDays, Clock, Users } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { StatePanel } from '@/components/StatePanel'
@@ -16,7 +17,7 @@ import { useCohorts, useProgrammes } from './data'
 import { DeliveryProgress } from './DeliveryProgress'
 import { Archive, ArchiveRestore, Download, Trash2 } from 'lucide-react'
 import { BulkBar, CardGrid, ItemCard, LayoutSwitch, RowActions } from '@/components/collection/Collection'
-import { useLayout } from '@/components/collection/layout'
+import { GRID_PANEL, useLayout } from '@/components/collection/layout'
 import { downloadCsv, runBulk, useSelection } from '@/components/collection/selection'
 import { api } from '@/lib/api'
 import { deleteForever, useRefreshStructure, type CohortSummary } from './data'
@@ -242,28 +243,32 @@ export function CohortsPage() {
               },
             ]}
           />
-          <Panel className="gap-0 max-md:py-2">
+          <Panel className={layout === 'grid' ? GRID_PANEL : 'gap-0 max-md:py-2'}>
             {visible.length === 0 ? (
               <StatePanel kind="no-results" title="No cohorts match" description="Try another name, or clear the filter." />
             ) : layout === 'grid' ? (
-              <div className="py-2">
+              <div>
                 <CardGrid label="Cohorts">
                   {paged.rows.map((c) => (
                     <ItemCard
                       key={c.id}
                       to={c.id}
                       title={c.name}
-                      subtitle={`${c.programme.name} · ${formatDateRange(c.startsOn, c.endsOn)}`}
+                      description={`${c.programme.name} · ${plural(c.courseNames.length, 'course')}: ${c.courseNames.join(', ') || 'none yet'}`}
                       badge={<CohortStatusBadge status={c.status} />}
                       select={{ checked: selection.has(c.id), onChange: () => selection.toggle(c.id) }}
+                      selecting={selection.count > 0}
                       actions={rowActions(c)}
-                      facts={[
-                        { label: 'Participants', value: c.participants },
-                        { label: 'Sessions', value: `${c.heldSessions} of ${c.plannedSessions || '—'}` },
-                        { label: 'Attendance, 4 wks', value: <Percent value={c.attendance4w} /> },
-                        { label: 'Needs attention', value: c.status === 'active' ? (c.needsAttention ?? 0) : '—' },
+                      progress={{
+                        label: 'Sessions delivered',
+                        value: c.plannedSessions ? Math.round((c.heldSessions / c.plannedSessions) * 100) : null,
+                        text: c.plannedSessions ? `${c.heldSessions} of ${c.plannedSessions}` : `${c.heldSessions} held`,
+                      }}
+                      meta={[
+                        { icon: <Users />, text: c.participants },
+                        { icon: <CalendarDays />, text: formatDateRange(c.startsOn, c.endsOn), label: 'Dates' },
+                        { icon: <Clock />, text: nextLabel(c), label: 'Next session' },
                       ]}
-                      footer={`Next session: ${nextLabel(c)}`}
                     />
                   ))}
                 </CardGrid>

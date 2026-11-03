@@ -1,3 +1,4 @@
+import { ClipboardCheck, Clock } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
@@ -21,7 +22,7 @@ import { useCohorts } from '@/pages/admin/programmes/data'
 import { useQueryClient } from '@tanstack/react-query'
 import { Download, Mail } from 'lucide-react'
 import { BulkBar, CardGrid, ItemCard, LayoutSwitch, RowActions } from '@/components/collection/Collection'
-import { useLayout } from '@/components/collection/layout'
+import { GRID_PANEL, useLayout } from '@/components/collection/layout'
 import { downloadCsv, runBulk, useSelection } from '@/components/collection/selection'
 import { api, ApiError } from '@/lib/api'
 
@@ -279,7 +280,7 @@ export function ParticipantsPage() {
             ]}
           />
 
-          <Panel className="gap-0 max-md:py-2">
+          <Panel className={layout === 'grid' ? GRID_PANEL : 'gap-0 max-md:py-2'}>
             {visible.length === 0 ? (
               <div role="status" className="flex flex-col items-center gap-3 p-8 text-center">
                 <span className="flex size-12 items-center justify-center rounded-lg bg-brand-subtle text-icon-brand">
@@ -299,23 +300,28 @@ export function ParticipantsPage() {
                 </Button>
               </div>
             ) : layout === 'grid' ? (
-              <div className="py-2">
+              <div>
                 <CardGrid label="Participants">
                   {paged.rows.map((p) => (
                     <ItemCard
                       key={p.id}
                       to={p.id}
                       title={name(p)}
-                      subtitle={p.email}
-                      leading={<Avatar size={40} initials={initials(p.firstName, p.lastName)} seed={p.id} />}
+                      description={p.enrolment ? `${p.enrolment.cohort.name} · ${p.enrolment.programmeName}` : `${p.email} · No cohort`}
+                      leading={<Avatar size={24} initials={initials(p.firstName, p.lastName)} seed={p.id} />}
                       badge={badge(p)}
                       select={{ checked: selection.has(p.id), onChange: () => selection.toggle(p.id) }}
+                      selecting={selection.count > 0}
                       actions={rowActions(p)}
-                      facts={[
-                        { label: 'Cohort', value: p.enrolment?.cohort.name ?? 'No cohort' },
-                        { label: 'Attendance', value: <Percent value={p.enrolment?.attendance?.rate} /> },
-                        { label: 'Assignments', value: <AssignmentsSummary value={p.enrolment?.assignments} /> },
-                        { label: 'Last active', value: p.lastSignInAt ? relativeDay(p.lastSignInAt, timeZone) : 'Not signed in' },
+                      progress={{ label: 'Attendance', value: p.enrolment?.attendance?.rate ?? null }}
+                      meta={[
+                        {
+                          icon: <ClipboardCheck />,
+                          text: p.enrolment?.assignments?.due
+                            ? `${p.enrolment.assignments.submitted} of ${p.enrolment.assignments.due} handed in`
+                            : 'Nothing due yet',
+                        },
+                        { icon: <Clock />, text: p.lastSignInAt ? relativeDay(p.lastSignInAt, timeZone) : 'Not signed in', label: 'Last active' },
                       ]}
                     />
                   ))}

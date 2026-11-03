@@ -1,3 +1,4 @@
+import { CalendarDays, Layers } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { StatePanel } from '@/components/StatePanel'
@@ -5,7 +6,7 @@ import { AlertBanner } from '@/components/ui/AlertBanner'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { BookOpenIcon, PlusIcon } from '@/components/ui/icons'
-import { EmptyState, FilterChips, Panel } from '@/components/ui/Page'
+import { Badge, EmptyState, FilterChips, Panel } from '@/components/ui/Page'
 import { CoursesHeader } from '@/pages/admin/sessions/CoursesHeader'
 import { SearchField } from '@/components/ui/SearchField'
 import { Cell, Row, Stacked, Table, TableFooter, type Column } from '@/components/ui/Table'
@@ -15,7 +16,7 @@ import { initials } from '@/lib/people'
 import { deleteForever, useCourses, useProgrammes, useRefreshStructure, type Course } from './data'
 import { Archive, ArchiveRestore, Download, Trash2 } from 'lucide-react'
 import { BulkBar, CardGrid, ItemCard, LayoutSwitch, RowActions } from '@/components/collection/Collection'
-import { useLayout } from '@/components/collection/layout'
+import { GRID_PANEL, useLayout } from '@/components/collection/layout'
 import { downloadCsv, runBulk, useSelection } from '@/components/collection/selection'
 import { api } from '@/lib/api'
 
@@ -225,7 +226,7 @@ export function CoursesPage() {
               },
             ]}
           />
-          <Panel className="gap-0 max-md:py-2">
+          <Panel className={layout === 'grid' ? GRID_PANEL : 'gap-0 max-md:py-2'}>
             {visible.length === 0 ? (
               <StatePanel
                 kind="no-results"
@@ -235,30 +236,27 @@ export function CoursesPage() {
                 }
               />
             ) : layout === 'grid' ? (
-              <div className="py-2">
+              <div>
                 <CardGrid label="Courses">
                   {paged.rows.map((c) => (
                     <ItemCard
                       key={c.id}
                       to={`/admin/courses/library/${c.id}`}
                       title={c.name}
-                      subtitle={c.programme.name}
+                      description={c.description || `Part of ${c.programme.name}.`}
+                      badge={<Badge tone="neutral">{c.programme.name}</Badge>}
                       select={{ checked: selection.has(c.id), onChange: () => selection.toggle(c.id) }}
+                      selecting={selection.count > 0}
                       actions={rowActions(c)}
-                      facts={[
-                        { label: 'Cohorts', value: c.cohorts.length || 'Not running yet' },
-                        { label: 'Sessions per cohort', value: c.plannedSessions ?? '—' },
+                      people={c.defaultLead ? [{ id: c.defaultLead.id, name: c.defaultLead.name }] : undefined}
+                      meta={[
+                        {
+                          icon: <Layers />,
+                          text: c.cohorts.length ? plural(c.cohorts.length, 'cohort') : 'Not running yet',
+                          label: c.cohorts.map((h) => h.name).join(', '),
+                        },
+                        { icon: <CalendarDays />, text: c.plannedSessions ? `${c.plannedSessions} sessions` : 'Sessions not set' },
                       ]}
-                      footer={
-                        c.defaultLead ? (
-                          <span className="flex min-w-0 items-center gap-2">
-                            <Avatar initials={initials(c.defaultLead.name)} seed={c.defaultLead.id} />
-                            <span className="truncate">Lead: {c.defaultLead.name}</span>
-                          </span>
-                        ) : (
-                          'No lead trainer yet'
-                        )
-                      }
                     />
                   ))}
                 </CardGrid>

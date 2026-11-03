@@ -6,11 +6,14 @@ import { AlertBanner } from '@/components/ui/AlertBanner'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Menu } from '@/components/ui/Menu'
+import { Avatar } from '@/components/ui/Avatar'
+import { initials } from '@/lib/people'
 import { SelectBox } from '@/components/ui/Table'
 import { TextField } from '@/components/ui/TextField'
 import { plural } from '@/lib/format'
 import type { BulkOutcome, Selection } from './selection'
 import type { Layout } from './layout'
+import { accentFor } from './accent'
 
 export function LayoutSwitch({ value, onChange }: { value: Layout; onChange: (l: Layout) => void }) {
   const options = [
@@ -18,7 +21,7 @@ export function LayoutSwitch({ value, onChange }: { value: Layout; onChange: (l:
     { value: 'grid' as const, label: 'Grid view', icon: <LayoutGrid aria-hidden className="size-4" /> },
   ]
   return (
-    <div role="group" aria-label="Layout" className="inline-flex h-9 shrink-0 rounded-md border border-default bg-surface p-0.5">
+    <div role="group" aria-label="Layout" className="inline-flex h-9 shrink-0 self-end rounded-md border border-default bg-surface p-0.5 md:self-auto">
       {options.map((o) => (
         <button
           key={o.value}
@@ -177,69 +180,123 @@ export function CardGrid({ children, label }: { children: ReactNode; label: stri
   )
 }
 
+export interface CardMeta {
+  icon: ReactNode
+  text: ReactNode
+  label?: string
+}
+
 /**
- * One item in grid view: a tick box and ⋯ menu along the top, the name (a link), a badge, then a few facts.
- * The whole card isn't a link, so the box and menu stay separate controls.
+ * One item in grid view (card style from the Flowdesk reference): a coloured dot and the name, ⋯ on the right,
+ * a two-line description, a status pill, an optional progress bar, then people and small facts along the bottom.
+ * The name is the link and stretches over the card; the tick box (shown on hover, or once anything is ticked) and
+ * ⋯ menu sit above it as separate controls.
  */
 export function ItemCard({
   to,
   title,
-  subtitle,
+  description,
   badge,
+  accent,
   leading,
-  facts,
+  progress,
+  people,
+  meta,
   footer,
   select,
   actions,
+  selecting,
 }: {
   to: string
   title: string
-  subtitle?: ReactNode
+  description?: ReactNode
   badge?: ReactNode
+  /** Dot colour; defaults to one picked from the link. */
+  accent?: string
+  /** Replaces the dot (e.g. a person's photo). */
   leading?: ReactNode
-  facts?: { label: string; value: ReactNode }[]
+  progress?: { label: string; value: number | null; text?: string }
+  people?: { id: string; name: string }[]
+  meta?: CardMeta[]
   footer?: ReactNode
   select?: { checked: boolean; onChange: () => void }
   actions?: ReactNode
+  /** Something on the page is ticked: show every box. */
+  selecting?: boolean
 }) {
+  const value = progress?.value === null || progress?.value === undefined ? null : Math.max(0, Math.min(100, progress.value))
   return (
     <li
       className={clsx(
-        'relative flex flex-col gap-3 rounded-lg border bg-surface p-4 transition-colors',
-        select?.checked ? 'border-brand bg-brand-subtle/30' : 'border-default hover:border-strong',
+        'group relative flex flex-col gap-3 rounded-xl border bg-surface p-5 shadow-[var(--shadow-raised)] transition-[border-color,box-shadow]',
+        select?.checked ? 'border-brand ring-1 ring-[var(--color-brand)]' : 'border-default hover:border-strong hover:shadow-[var(--shadow-overlay)]',
       )}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-2.5">
         {select && (
-          <span className="relative z-[1] pt-0.5">
+          <span
+            className={clsx(
+              'relative z-[1] flex transition-opacity',
+              !select.checked &&
+                !selecting &&
+                'md:w-0 md:overflow-hidden md:opacity-0 md:group-focus-within:w-auto md:group-focus-within:opacity-100 md:group-hover:w-auto md:group-hover:opacity-100',
+            )}
+          >
             <SelectBox checked={select.checked} onChange={select.onChange} label={`Select ${title}`} />
           </span>
         )}
-        {leading}
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <Link
-            to={to}
-            className="truncate text-body-strong text-primary after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:underline focus-visible:outline-none"
-          >
-            {title}
-          </Link>
-          {subtitle && <span className="truncate text-caption text-secondary">{subtitle}</span>}
-        </div>
-        {/* Above the card-wide link. */}
-        <span className="relative z-[1] -mt-1 -mr-1">{actions}</span>
+        {leading ?? <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ background: accent ?? accentFor(to) }} />}
+        <Link
+          to={to}
+          className="min-w-0 flex-1 truncate text-[15px] leading-5 font-semibold text-primary after:absolute after:inset-0 after:rounded-xl after:content-[''] hover:underline focus-visible:outline-none focus-visible:after:shadow-[var(--shadow-focus)]"
+        >
+          {title}
+        </Link>
+        <span className="relative z-[1] -my-1 -mr-2 shrink-0">{actions}</span>
       </div>
+      {description && <p className="line-clamp-2 min-h-9 text-body text-secondary">{description}</p>}
       {badge && <div className="flex flex-wrap gap-1.5">{badge}</div>}
-      {facts && facts.length > 0 && (
-        <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
-          {facts.map((f) => (
-            <div key={f.label} className="flex min-w-0 flex-col">
-              <dt className="truncate text-caption text-secondary">{f.label}</dt>
-              <dd className="truncate text-body-strong text-primary tabular-nums">{f.value}</dd>
-            </div>
-          ))}
-        </dl>
+      {progress && (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between text-caption">
+            <span className="text-secondary">{progress.label}</span>
+            <span className="font-semibold text-primary tabular-nums">{progress.text ?? (value === null ? '—' : `${value}%`)}</span>
+          </div>
+          <div
+            className="h-1.5 overflow-hidden rounded-full bg-chart-track"
+            role="progressbar"
+            aria-label={progress.label}
+            aria-valuenow={value ?? undefined}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div className="h-full rounded-full bg-brand" style={{ width: `${value ?? 0}%` }} />
+          </div>
+        </div>
       )}
-      {footer && <div className="border-t border-default pt-3 text-caption text-secondary">{footer}</div>}
+      {(people?.length || meta?.length || footer) && (
+        <div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 pt-1 text-caption text-secondary">
+          {people && people.length > 0 && (
+            <span className="flex -space-x-1.5" aria-label={people.map((p) => p.name).join(', ')}>
+              {people.slice(0, 3).map((p) => (
+                <Avatar key={p.id} size={24} initials={initials(p.name)} seed={p.id} className="ring-2 ring-[var(--color-surface)]" />
+              ))}
+              {people.length > 3 && (
+                <span className="inline-flex size-6 items-center justify-center rounded-full bg-neutral-bg text-[10px] font-semibold text-neutral-fg ring-2 ring-[var(--color-surface)]">
+                  +{people.length - 3}
+                </span>
+              )}
+            </span>
+          )}
+          {meta?.map((m, i) => (
+            <span key={i} className="inline-flex min-w-0 items-center gap-1" title={m.label}>
+              <span className="shrink-0 text-icon [&>svg]:size-3.5">{m.icon}</span>
+              <span className="truncate">{m.text}</span>
+            </span>
+          ))}
+          {footer}
+        </div>
+      )}
     </li>
   )
 }
