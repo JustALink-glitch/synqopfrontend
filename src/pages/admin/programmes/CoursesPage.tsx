@@ -30,6 +30,7 @@ export function CoursesPage() {
   const location = useLocation()
   const created = (location.state as { created?: string } | null)?.created
   const archivedName = (location.state as { archived?: string } | null)?.archived
+  const deletedName = (location.state as { deleted?: string } | null)?.deleted
   const [programme, setProgramme] = useState('all')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -60,6 +61,7 @@ export function CoursesPage() {
         </AlertBanner>
       )}
 
+      {deletedName && <AlertBanner tone="success" title={`${deletedName} was deleted`} />}
       {archivedName && (
         <AlertBanner tone="success" title={`${archivedName} was archived`}>
           Cohorts that run it keep everything. Find it under Archived to restore it.

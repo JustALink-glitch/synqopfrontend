@@ -36,6 +36,7 @@ export function CohortsPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const archivedName = (location.state as { archived?: string } | null)?.archived
+  const deletedName = (location.state as { deleted?: string } | null)?.deleted
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -65,6 +66,7 @@ export function CohortsPage() {
   return (
     <>
       <PageHeader title="Cohorts" description="Every cohort across your programmes." actions={all.length > 0 ? newButton : undefined} />
+      {deletedName && <AlertBanner tone="success" title={`${deletedName} was deleted`} />}
       {archivedName && (
         <AlertBanner tone="success" title={`${archivedName} was archived`}>
           It’s read-only now. You can restore it from the Archived filter.

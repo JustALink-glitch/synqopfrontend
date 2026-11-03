@@ -19,7 +19,7 @@ export interface Me {
     /** Short-lived link to their profile photo. */
     photoUrl?: string | null
   }
-  organisation: { id: string; name: string; timeZone: string; deletionScheduledFor?: string | null } | null
+  organisation: { id: string; name: string; timeZone: string; deletionScheduledFor?: string | null; logoUrl?: string | null } | null
 }
 
 /** Why a signed-in account can't use the app (API error codes from /v1/me). */

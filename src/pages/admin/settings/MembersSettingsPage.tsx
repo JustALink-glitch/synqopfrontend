@@ -9,7 +9,8 @@ import { Menu } from '@/components/ui/Menu'
 import { Badge, Panel, PanelHeader } from '@/components/ui/Page'
 import { Cell, Row, Table } from '@/components/ui/Table'
 import { TextField } from '@/components/ui/TextField'
-import { ApiError } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
+import { checkPassword } from '@/lib/password-check'
 import { plural, relativeDay } from '@/lib/format'
 import { initials, roleLabel, splitFullName } from '@/lib/people'
 import type { Role } from '@/lib/roles'
@@ -44,11 +45,13 @@ const roles: { role: string; text: string }[] = [
   { role: 'Participant', text: 'Completes training. Managed under Participants, not here.' },
 ]
 
-type Open = { kind: 'invite' } | { kind: 'role' | 'remove' | 'cancel' | 'edit'; member: StaffMember } | null
+type Open = { kind: 'invite' } | { kind: 'role' | 'remove' | 'cancel' | 'edit' | 'transfer'; member: StaffMember } | null
 
 /** /admin/settings/members — F1.02 Members & roles, with Invite (F1.02a), Change role (F1.02b) and Remove (F1.02c). */
 export function MembersSettingsPage() {
   const query = useStaff()
+  const auth = useAuth()
+  const isOwner = auth.state.status === 'signed-in' && auth.state.me.membership.role === 'owner'
   const [open, setOpen] = useState<Open>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
   const invitation = useInvitationAction()
@@ -76,7 +79,11 @@ export function MembersSettingsPage() {
     <>
       <SettingsTitle
         title="Members & roles"
-        description="Staff who can sign in. Participants are managed under Participants."
+        description={
+          isOwner
+            ? 'Staff who can sign in. Participants are managed under Participants. To hand over ownership, choose Edit › Transfer ownership on an admin.'
+            : 'Staff who can sign in. Participants are managed under Participants.'
+        }
         action={
           <Button
             onClick={() => {
@@ -113,6 +120,7 @@ export function MembersSettingsPage() {
       <InviteDialog open={open?.kind === 'invite'} onClose={() => setOpen(null)} onDone={done} />
       {open && open.kind === 'role' && <RoleDialog member={open.member} onClose={() => setOpen(null)} onDone={done} />}
       {open && open.kind === 'edit' && <EditMemberDialog member={open.member} onClose={() => setOpen(null)} onDone={done} />}
+      {open && open.kind === 'transfer' && <TransferDialog member={open.member} onClose={() => setOpen(null)} onDone={done} />}
       {open && (open.kind === 'remove' || open.kind === 'cancel') && <RemoveDialog member={open.member} onClose={() => setOpen(null)} onDone={done} />}
     </>
   )
@@ -137,6 +145,9 @@ function MembersTable({ members, onOpen, onResend }: { members: StaffMember[]; o
         : [
             { label: 'Edit details', onSelect: () => onOpen({ kind: 'edit', member: m }) },
             { label: 'Change role', onSelect: () => onOpen({ kind: 'role', member: m }) },
+            ...(me?.membership.role === 'owner' && m.role === 'admin' && m.status === 'active'
+              ? [{ label: 'Transfer ownership', onSelect: () => onOpen({ kind: 'transfer', member: m }) }]
+              : []),
             { label: 'Remove member', onSelect: () => onOpen({ kind: 'remove', member: m }), destructive: true },
           ]
     return <Menu variant="link" label="Edit" accessibleLabel={`Edit ${fullNameOf(m)}`} items={items} />
@@ -439,5 +450,70 @@ function EditMemberDialog({ member, onClose, onDone }: { member: StaffMember; on
       onDone={(title) => onDone({ tone: 'success', title })}
       emailLocked={member.role === 'admin' && !owner ? 'Only the owner can change another admin’s sign-in email.' : undefined}
     />
+  )
+}
+
+/** Ownership transfer (pilot feedback, Nov 2026): the owner hands over to an active admin, after entering their password. */
+function TransferDialog({ member, onClose, onDone }: { member: StaffMember; onClose: () => void; onDone: (notice: Notice) => void }) {
+  const { state, refresh } = useAuth()
+  const me = state.status === 'signed-in' ? state.me : null
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [failed, setFailed] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const name = fullNameOf(member)
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    setError(null)
+    setFailed(null)
+    if (!password) return setError('Enter your password.')
+    setBusy(true)
+    try {
+      if (!(await checkPassword(me?.user.email ?? '', password))) {
+        setError('That password isn’t right.')
+        return
+      }
+      await api(`/v1/members/${member.id}/transfer-ownership`, { method: 'POST', body: {} })
+      await refresh()
+      onDone({ tone: 'success', title: `${name} is now the owner`, body: 'You’re an admin now. We emailed you both.' })
+    } catch (e) {
+      setFailed(e instanceof ApiError && e.status < 500 ? e.message : 'Ownership wasn’t transferred. Try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open
+      onClose={() => !busy && onClose()}
+      width={440}
+      title={`Make ${name} the owner?`}
+      description={`${member.firstName} gets full control: billing, data export and deletion, and every member. You become an admin. Only ${member.firstName} can give ownership back.`}
+      actions={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button type="submit" form="transfer-ownership" variant="destructive" disabled={busy}>
+            {busy ? 'Transferring…' : 'Transfer ownership'}
+          </Button>
+        </>
+      }
+    >
+      <form id="transfer-ownership" onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
+        {failed && <AlertBanner tone="error" title={failed} />}
+        <TextField
+          label="Your password"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => (setPassword(e.target.value), setError(null))}
+          error={error}
+          helper="We ask again because this changes who controls your organisation."
+        />
+      </form>
+    </Dialog>
   )
 }

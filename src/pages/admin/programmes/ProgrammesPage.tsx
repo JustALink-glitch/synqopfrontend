@@ -46,6 +46,7 @@ export function ProgrammesPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const notice = (location.state as { archived?: string } | null)?.archived
+  const deletedName = (location.state as { deleted?: string } | null)?.deleted
 
   const all = useMemo(() => query.data?.programmes ?? [], [query.data])
   const live = all.filter((p) => p.status !== 'archived')
@@ -68,6 +69,7 @@ export function ProgrammesPage() {
   return (
     <>
       <PageHeader title="Programmes" description={DESCRIPTION} actions={all.length > 0 ? newButton : undefined} />
+      {deletedName && <AlertBanner tone="success" title={`${deletedName} was deleted`} />}
       {notice && (
         <AlertBanner tone="success" title={`${notice} was archived`}>
           It’s read-only now. You can restore it from the Archived filter.

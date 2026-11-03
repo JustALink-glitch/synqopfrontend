@@ -79,9 +79,13 @@ function OrganisationLabel({ me, area, compact }: { me: Me; area: Area; compact?
   const name = me.organisation?.name ?? ''
   return (
     <div className={clsx('flex h-[52px] items-center gap-3 rounded-md px-2', !compact && 'max-xl:px-0')} title={name}>
-      <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-sm bg-brand text-caption-strong text-on-brand">
-        {initials(name)}
-      </span>
+      {me.organisation?.logoUrl ? (
+        <img src={me.organisation.logoUrl} alt="" aria-hidden="true" className="size-8 shrink-0 rounded-sm object-contain" />
+      ) : (
+        <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-sm bg-brand text-caption-strong text-on-brand">
+          {initials(name)}
+        </span>
+      )}
       <span className={clsx('flex min-w-0 flex-col', !compact && 'max-xl:sr-only')}>
         <span className="truncate text-body-emphasis text-primary">{name}</span>
         <span className="truncate text-caption text-secondary">{WORKSPACE_LABEL[area]}</span>

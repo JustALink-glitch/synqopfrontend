@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { PermanentDeleteSection } from '@/components/admin/PermanentDelete'
 import { useNavigate, useParams } from 'react-router'
 import { StatePanel } from '@/components/StatePanel'
 import { AlertBanner } from '@/components/ui/AlertBanner'
@@ -217,6 +218,7 @@ function ProgrammeForm({
                 </Button>
               </div>
             )}
+            {existing && <PermanentDeleteSection kind="programme" id={existing.id} />}
 
             <div className="flex gap-3 max-md:flex-col-reverse max-md:[&>*]:h-11">
               <Button variant="secondary" onClick={() => navigate(existing ? `/admin/programmes/${existing.id}` : '/admin/programmes')} disabled={saving}>

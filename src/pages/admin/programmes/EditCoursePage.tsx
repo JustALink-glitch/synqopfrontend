@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { PermanentDeleteSection } from '@/components/admin/PermanentDelete'
 import { useNavigate, useParams } from 'react-router'
 import { StatePanel } from '@/components/StatePanel'
 import { AlertBanner } from '@/components/ui/AlertBanner'
@@ -169,6 +170,7 @@ function CourseForm({ data }: { data: CourseDetail }) {
               Archive course
             </Button>
           </div>
+          <PermanentDeleteSection kind="course" id={c.id} />
         </Panel>
       </FormLayout>
       <Dialog

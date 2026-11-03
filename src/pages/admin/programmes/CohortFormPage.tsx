@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { PermanentDeleteSection } from '@/components/admin/PermanentDelete'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { StatePanel } from '@/components/StatePanel'
 import { AlertBanner } from '@/components/ui/AlertBanner'
@@ -289,6 +290,7 @@ function CohortForm({
                 </Button>
               </div>
             )}
+            {existing && <PermanentDeleteSection kind="cohort" id={existing.id} />}
 
             <div className="flex gap-3 max-md:flex-col-reverse max-md:[&>*]:h-11">
               <Button variant="secondary" onClick={() => navigate(backTo)} disabled={saving}>
