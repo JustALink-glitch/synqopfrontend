@@ -19,10 +19,12 @@ import {
   useChangeRole,
   useInvitationAction,
   useInviteMember,
+  useMember,
   useRemoveMember,
   useStaff,
   type StaffMember,
 } from '@/pages/admin/people/members'
+import { EditDialog } from '@/pages/admin/people/TrainerDialogs'
 import { RadioList, SettingsLoader } from './SettingsBits'
 import { SettingsTitle } from './SettingsLayout'
 import type { Notice } from './settingsForm'
@@ -42,7 +44,7 @@ const roles: { role: string; text: string }[] = [
   { role: 'Participant', text: 'Completes training. Managed under Participants, not here.' },
 ]
 
-type Open = { kind: 'invite' } | { kind: 'role' | 'remove' | 'cancel'; member: StaffMember } | null
+type Open = { kind: 'invite' } | { kind: 'role' | 'remove' | 'cancel' | 'edit'; member: StaffMember } | null
 
 /** /admin/settings/members — F1.02 Members & roles, with Invite (F1.02a), Change role (F1.02b) and Remove (F1.02c). */
 export function MembersSettingsPage() {
@@ -110,6 +112,7 @@ export function MembersSettingsPage() {
 
       <InviteDialog open={open?.kind === 'invite'} onClose={() => setOpen(null)} onDone={done} />
       {open && open.kind === 'role' && <RoleDialog member={open.member} onClose={() => setOpen(null)} onDone={done} />}
+      {open && open.kind === 'edit' && <EditMemberDialog member={open.member} onClose={() => setOpen(null)} onDone={done} />}
       {open && (open.kind === 'remove' || open.kind === 'cancel') && <RemoveDialog member={open.member} onClose={() => setOpen(null)} onDone={done} />}
     </>
   )
@@ -127,10 +130,12 @@ function MembersTable({ members, onOpen, onResend }: { members: StaffMember[]; o
     const items =
       m.status === 'invited'
         ? [
+            { label: 'Edit details', onSelect: () => onOpen({ kind: 'edit', member: m }) },
             { label: 'Resend invitation', onSelect: () => onResend(m) },
             { label: 'Cancel invitation', onSelect: () => onOpen({ kind: 'cancel', member: m }), destructive: true },
           ]
         : [
+            { label: 'Edit details', onSelect: () => onOpen({ kind: 'edit', member: m }) },
             { label: 'Change role', onSelect: () => onOpen({ kind: 'role', member: m }) },
             { label: 'Remove member', onSelect: () => onOpen({ kind: 'remove', member: m }), destructive: true },
           ]
@@ -418,5 +423,21 @@ function RemoveDialog({ member, onClose, onDone }: { member: StaffMember; onClos
       )}
       {error && <p className="text-caption text-error-fg">{error}</p>}
     </Dialog>
+  )
+}
+
+/** Edit another member's name, email and phone (pilot feedback, Nov 2026). Loads their full details first. */
+function EditMemberDialog({ member, onClose, onDone }: { member: StaffMember; onClose: () => void; onDone: (notice: Notice) => void }) {
+  const { state } = useAuth()
+  const owner = state.status === 'signed-in' && state.me.membership.role === 'owner'
+  const detail = useMember(member.id)
+  if (!detail.data) return null
+  return (
+    <EditDialog
+      member={detail.data.member}
+      onClose={onClose}
+      onDone={(title) => onDone({ tone: 'success', title })}
+      emailLocked={member.role === 'admin' && !owner ? 'Only the owner can change another admin’s sign-in email.' : undefined}
+    />
   )
 }

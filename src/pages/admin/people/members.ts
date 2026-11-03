@@ -84,6 +84,8 @@ export interface InviteInput {
   firstName: string
   lastName: string
   role: Exclude<Role, 'owner'>
+  /** Trainers only: cohorts to assign straight away. No courseId = every course in the cohort. */
+  assignments?: { cohortId: string; courseId?: string }[]
 }
 
 export function useInviteMember() {
@@ -176,7 +178,7 @@ const useMemberMutation = <T, R>(fn: (input: T) => Promise<R>) => {
 
 /** B2.04 Assign to a course in a cohort. */
 export const useAssignTrainer = (id: string) =>
-  useMemberMutation((input: { cohortId: string; courseId: string; role: 'lead' | 'assistant' }) =>
+  useMemberMutation((input: { cohortId: string; courseId?: string; role: 'lead' | 'assistant' }) =>
     api<{ course: string; cohort: string; replaced: string | null }>(`/v1/members/${id}/assignments`, { method: 'POST', body: input }),
   )
 export const useUnassignTrainer = (id: string) =>

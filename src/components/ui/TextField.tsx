@@ -1,6 +1,6 @@
 import clsx from 'clsx'
-import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
-import { ChevronDownIcon, InfoCircleIcon } from './icons'
+import { useId, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
+import { ChevronDownIcon, EyeIcon, EyeOffIcon, InfoCircleIcon } from './icons'
 
 interface FieldChrome {
   label: string
@@ -17,14 +17,20 @@ const controlClass = (hasError: boolean, disabled?: boolean) =>
   clsx(
     'h-9 w-full rounded-md border px-3 text-body outline-none transition-[border-color,box-shadow]',
     'placeholder:text-muted',
-    disabled
-      ? 'cursor-not-allowed border-default bg-surface-hover text-disabled'
-      : 'bg-surface text-primary',
+    disabled ? 'cursor-not-allowed border-default bg-surface-hover text-disabled' : 'bg-surface text-primary',
     !disabled && (hasError ? 'border-error' : 'border-strong focus:border-focus'),
     !disabled && 'focus:shadow-[var(--shadow-focus)]',
   )
 
-function Chrome({ id, label, optional, helper, error, disabled, children }: FieldChrome & {
+function Chrome({
+  id,
+  label,
+  optional,
+  helper,
+  error,
+  disabled,
+  children,
+}: FieldChrome & {
   id: string
   disabled?: boolean | undefined
   children: ReactNode
@@ -65,6 +71,36 @@ export function TextField({
 }: FieldChrome & InputHTMLAttributes<HTMLInputElement>) {
   const generated = useId()
   const id = idProp ?? generated
+  const [shown, setShown] = useState(false)
+  if (input.type === 'password') {
+    // Show/hide button on every password field (pilot feedback, Nov 2026).
+    return (
+      <Chrome id={id} label={label} optional={optional} helper={helper} error={error} disabled={disabled}>
+        <div className="relative">
+          <input
+            id={id}
+            disabled={disabled}
+            aria-invalid={error || invalid ? true : undefined}
+            aria-describedby={error || helper ? `${id}-help` : undefined}
+            className={clsx(controlClass(Boolean(error) || Boolean(invalid), disabled), 'pr-10', className)}
+            {...input}
+            type={shown ? 'text' : 'password'}
+          />
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setShown((s) => !s)}
+            aria-label={shown ? 'Hide password' : 'Show password'}
+            aria-pressed={shown}
+            aria-controls={id}
+            className="absolute inset-y-0 right-0 inline-flex w-10 items-center justify-center rounded-r-md text-secondary hover:text-primary focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none disabled:cursor-not-allowed disabled:text-disabled"
+          >
+            {shown ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
+          </button>
+        </div>
+      </Chrome>
+    )
+  }
   return (
     <Chrome id={id} label={label} optional={optional} helper={helper} error={error} disabled={disabled}>
       <input

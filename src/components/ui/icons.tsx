@@ -432,3 +432,30 @@ export const LockIcon = (props: IconProps) => (
     <circle cx="12" cy="15.5" r="1.5" fill="currentColor" />
   </Icon>
 )
+
+/** Icon / eye: show password. Linear style, matches LockIcon. */
+export const EyeIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path
+      d="M2.5 12C4.5 7.5 8 5 12 5C16 5 19.5 7.5 21.5 12C19.5 16.5 16 19 12 19C8 19 4.5 16.5 2.5 12Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+  </Icon>
+)
+
+/** Icon / eye-off: hide password. */
+export const EyeOffIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path
+      d="M9.9 5.2C10.6 5.1 11.3 5 12 5C16 5 19.5 7.5 21.5 12C20.9 13.3 20.2 14.4 19.3 15.4M14.1 14.2C13.6 14.7 12.8 15 12 15C10.3 15 9 13.7 9 12C9 11.2 9.3 10.4 9.8 9.9M17 17.1C15.5 18.3 13.8 19 12 19C8 19 4.5 16.5 2.5 12C3.5 9.8 4.9 8.1 6.6 6.9"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path d="M3 3L21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </Icon>
+)

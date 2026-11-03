@@ -6,6 +6,7 @@ import { Dialog } from '@/components/ui/Dialog'
 import { SelectField, TextField } from '@/components/ui/TextField'
 import { ApiError } from '@/lib/api'
 import { useCohort, useCohorts } from '@/pages/admin/programmes/data'
+import { useProgrammeSetup } from '@/pages/admin/settings/data'
 import { fullNameOf, useAssignTrainer, useDeactivateMember, useEditMember, type Assignment, type MemberDetail } from './members'
 
 const failure = (e: unknown) => (e instanceof ApiError && e.status < 500 ? e.message : 'That didn’t work. Check your connection and try again.')
@@ -32,6 +33,10 @@ function Radio({ name, checked, onChange, children }: { name: string; checked: b
 /** B2.04 Assign trainer to a course in a cohort. */
 export function AssignDialog({ member, onClose, onDone }: { member: MemberDetail; onClose: () => void; onDone: (message: string) => void }) {
   const cohorts = useCohorts()
+  const setup = useProgrammeSetup().data?.settings
+  // "Assign trainers: to the whole cohort" in Programme setup: no course to pick.
+  const wholeCohort = setup?.trainerAssignment === 'cohort'
+  const assistantsOn = setup?.assistantsEnabled ?? true
   const open = (cohorts.data ?? []).filter((c) => c.status === 'active' || c.status === 'upcoming' || c.status === 'draft')
   const [cohortId, setCohortId] = useState('')
   const cohort = useCohort(cohortId)
@@ -48,12 +53,12 @@ export function AssignDialog({ member, onClose, onDone }: { member: MemberDetail
     event.preventDefault()
     const next: Record<string, string> = {}
     if (!cohortId) next.cohortId = 'Choose a cohort.'
-    if (!courseId) next.courseId = 'Choose a course.'
+    if (!courseId && !wholeCohort) next.courseId = 'Choose a course.'
     setErrors(next)
     setError(null)
     if (Object.keys(next).length) return
     try {
-      const r = await assign.mutateAsync({ cohortId, courseId, role })
+      const r = await assign.mutateAsync({ cohortId, ...(!wholeCohort && { courseId }), role })
       onDone(
         `${member.firstName} now ${role === 'lead' ? 'leads' : 'assists on'} ${r.course} in ${r.cohort}${r.replaced ? `. ${r.replaced} is now an assistant.` : '.'}`,
       )
@@ -68,8 +73,12 @@ export function AssignDialog({ member, onClose, onDone }: { member: MemberDetail
     <Dialog
       open
       onClose={onClose}
-      title={`Assign ${fullNameOf(member)} to a course`}
-      description={`${member.firstName} will see the course’s sessions, participants and assignments in that cohort.`}
+      title={wholeCohort ? `Assign ${fullNameOf(member)} to a cohort` : `Assign ${fullNameOf(member)} to a course`}
+      description={
+        wholeCohort
+          ? `${member.firstName} will teach every course in the cohort, and see its sessions, participants and assignments.`
+          : `${member.firstName} will see the course’s sessions, participants and assignments in that cohort.`
+      }
       actions={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -101,33 +110,37 @@ export function AssignDialog({ member, onClose, onDone }: { member: MemberDetail
             </option>
           ))}
         </SelectField>
-        <SelectField
-          label="Course"
-          value={courseId}
-          disabled={!cohortId || cohort.isPending}
-          onChange={(e) => {
-            setCourseId(e.target.value)
-            setErrors({})
-          }}
-          error={errors.courseId}
-          helper="Courses this cohort runs."
-        >
-          <option value="">{cohortId && cohort.isPending ? 'Loading…' : 'Choose a course'}</option>
-          {(cohort.data?.courses ?? []).map((c) => (
-            <option key={c.courseId} value={c.courseId}>
-              {c.name}
-            </option>
-          ))}
-        </SelectField>
-        <fieldset className="flex flex-col gap-2.5">
-          <legend className="pb-1 text-caption-strong text-primary">Role</legend>
-          <Radio name="assign-role" checked={role === 'lead'} onChange={() => setRole('lead')}>
-            Lead — takes attendance, submits session reports
-          </Radio>
-          <Radio name="assign-role" checked={role === 'assistant'} onChange={() => setRole('assistant')}>
-            Assistant — can do what Programme setup allows
-          </Radio>
-        </fieldset>
+        {!wholeCohort && (
+          <SelectField
+            label="Course"
+            value={courseId}
+            disabled={!cohortId || cohort.isPending}
+            onChange={(e) => {
+              setCourseId(e.target.value)
+              setErrors({})
+            }}
+            error={errors.courseId}
+            helper="Courses this cohort runs."
+          >
+            <option value="">{cohortId && cohort.isPending ? 'Loading…' : 'Choose a course'}</option>
+            {(cohort.data?.courses ?? []).map((c) => (
+              <option key={c.courseId} value={c.courseId}>
+                {c.name}
+              </option>
+            ))}
+          </SelectField>
+        )}
+        {assistantsOn && (
+          <fieldset className="flex flex-col gap-2.5">
+            <legend className="pb-1 text-caption-strong text-primary">Role</legend>
+            <Radio name="assign-role" checked={role === 'lead'} onChange={() => setRole('lead')}>
+              Lead — takes attendance, submits session reports
+            </Radio>
+            <Radio name="assign-role" checked={role === 'assistant'} onChange={() => setRole('assistant')}>
+              Assistant — can do what Programme setup allows
+            </Radio>
+          </fieldset>
+        )}
         {course &&
           (already ? (
             <AlertBanner title={`${member.firstName} already ${already.isLead ? 'leads' : 'assists on'} this course here`}>
@@ -147,8 +160,19 @@ export function AssignDialog({ member, onClose, onDone }: { member: MemberDetail
   )
 }
 
-/** B2.05 Edit trainer details. */
-export function EditDialog({ member, onClose, onDone }: { member: MemberDetail; onClose: () => void; onDone: (message: string) => void }) {
+/** B2.05 Edit trainer details. Also used for admins in Settings › Members (pilot feedback, Nov 2026). */
+export function EditDialog({
+  member,
+  onClose,
+  onDone,
+  emailLocked,
+}: {
+  member: MemberDetail
+  onClose: () => void
+  onDone: (message: string) => void
+  /** Why the email can't be changed here, e.g. only the owner can change another admin's sign-in email. */
+  emailLocked?: string
+}) {
   const edit = useEditMember(member.id)
   const [fullName, setFullName] = useState(fullNameOf(member))
   const [email, setEmail] = useState(member.email)
@@ -180,7 +204,9 @@ export function EditDialog({ member, onClose, onDone }: { member: MemberDetail; 
       open
       onClose={onClose}
       title={`Edit ${member.firstName}’s details`}
-      description="Their courses, sessions and reports stay as they are."
+      description={
+        member.role === 'admin' ? 'Their access stays as it is. To change it, use Change role.' : 'Their courses, sessions and reports stay as they are.'
+      }
       actions={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -200,13 +226,17 @@ export function EditDialog({ member, onClose, onDone }: { member: MemberDetail; 
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          disabled={Boolean(emailLocked)}
           error={errors.email}
           helper={
-            member.status === 'active' ? 'Their sign-in email. If you change it, we email the new address to let them know.' : 'Where their invitation goes.'
+            emailLocked ??
+            (member.status === 'active' ? 'Their sign-in email. If you change it, we email the new address to let them know.' : 'Where their invitation goes.')
           }
         />
         <TextField label="Phone" optional type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} error={errors.phone} />
-        <p className="text-caption text-secondary">To change which courses {member.firstName} teaches or their role in them, use Assign to course.</p>
+        {(member.role === 'trainer' || member.role === 'assistant_trainer') && (
+          <p className="text-caption text-secondary">To change which courses {member.firstName} teaches or their role in them, use Assign to course.</p>
+        )}
       </form>
     </Dialog>
   )

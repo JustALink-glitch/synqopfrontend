@@ -54,7 +54,7 @@ export function SignUpPage() {
       })
       navigate('/sign-in', { state: { confirmEmail: normalised } })
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'email_exists') setEmailInUse(true)
+      if (e instanceof ApiError && (e.code === 'email_exists' || e.code === 'account_exists')) setEmailInUse(true)
       else if (e instanceof ApiError && e.code === 'weak_password') setErrors({ password: 'Choose a stronger password.' })
       else if (e instanceof ApiError && e.code === 'captcha_failed') setRobot(true)
       else setNetworkError(true)

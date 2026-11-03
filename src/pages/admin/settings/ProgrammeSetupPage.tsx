@@ -44,7 +44,7 @@ function SetupForm({ settings }: { settings: ProgrammeSetup }) {
     await form.save(async () => (await save.mutateAsync(draft)).settings, {
       tone: 'success',
       title: 'Programme setup saved',
-      body: 'New programmes and cohorts use these choices.',
+      body: 'The changes apply straight away, across every programme and cohort.',
     })
   }
 
@@ -56,7 +56,7 @@ function SetupForm({ settings }: { settings: ProgrammeSetup }) {
         </AlertBanner>
       ) : (
         <AlertBanner tone="info" title="These choices shape every programme">
-          Changing them later only affects new programmes and cohorts. Existing ones keep their current setup.
+          Changes apply straight away to every programme and cohort. Trainers you’ve already assigned keep their courses.
         </AlertBanner>
       )}
 

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { CourseResourcesPanel } from '@/components/resources/CourseResourcesPanel'
 import { Link, Outlet, useNavigate, useOutletContext, useParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { StatePanel } from '@/components/StatePanel'
@@ -422,28 +423,34 @@ const courseColumns: Column[] = [
 /** T3.05 Courses. */
 export function MyCohortCourses() {
   const { data } = useOutletContext<Context>()
+  const mine = data.courses.filter((c) => c.mine)
   return (
-    <Panel className="gap-0 max-md:py-2">
-      <PanelHeader title="Courses" description="Every course this cohort runs. You can schedule and take registers for yours." />
-      <div className="mt-2">
-        <Table columns={courseColumns}>
-          {data.courses.map((c) => (
-            <Row key={c.id}>
-              <Cell>
-                <span className="flex items-center gap-2">
-                  <span className="text-body-strong text-primary">{c.name}</span>
-                  {c.mine && <Badge tone="info">Yours</Badge>}
-                </span>
-              </Cell>
-              <Cell hideBelow="lg" className="truncate">
-                {c.trainers.map((t) => `${t.name}${t.isLead ? ' (lead)' : ''}`).join(', ') || <span className="text-muted">None yet</span>}
-              </Cell>
-              <Cell className="tabular-nums">{c.plannedSessions ? `${c.heldSessions} of ${c.plannedSessions} held` : `${c.heldSessions} held`}</Cell>
-              <Cell hideBelow="xl">{c.firstSessionAt ? formatDay(c.firstSessionAt, data.timeZone) : <span className="text-muted">—</span>}</Cell>
-            </Row>
-          ))}
-        </Table>
-      </div>
-    </Panel>
+    <div className="flex flex-col gap-4">
+      <Panel className="gap-0 max-md:py-2">
+        <PanelHeader title="Courses" description="Every course this cohort runs. You can schedule and take registers for yours." />
+        <div className="mt-2">
+          <Table columns={courseColumns}>
+            {data.courses.map((c) => (
+              <Row key={c.id}>
+                <Cell>
+                  <span className="flex items-center gap-2">
+                    <span className="text-body-strong text-primary">{c.name}</span>
+                    {c.mine && <Badge tone="info">Yours</Badge>}
+                  </span>
+                </Cell>
+                <Cell hideBelow="lg" className="truncate">
+                  {c.trainers.map((t) => `${t.name}${t.isLead ? ' (lead)' : ''}`).join(', ') || <span className="text-muted">None yet</span>}
+                </Cell>
+                <Cell className="tabular-nums">{c.plannedSessions ? `${c.heldSessions} of ${c.plannedSessions} held` : `${c.heldSessions} held`}</Cell>
+                <Cell hideBelow="xl">{c.firstSessionAt ? formatDay(c.firstSessionAt, data.timeZone) : <span className="text-muted">—</span>}</Cell>
+              </Row>
+            ))}
+          </Table>
+        </div>
+      </Panel>
+      {mine.map((c) => (
+        <CourseResourcesPanel key={c.id} cohortCourseId={c.id} courseName={c.name} cohortName={data.cohort.name} />
+      ))}
+    </div>
   )
 }

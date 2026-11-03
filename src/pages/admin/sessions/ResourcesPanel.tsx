@@ -121,12 +121,43 @@ export function AddResourceDialog({ data, onClose, onAdded }: { data: SessionDet
   const { state } = useAuth()
   const timeZone = state.status === 'signed-in' ? state.me.organisation?.timeZone : undefined
   const add = useAddResource(s.id)
+  return (
+    <ResourceDialog
+      description={`For ${s.course.name} in ${s.cohort.name}.`}
+      uploadsEndpoint={`/v1/sessions/${s.id}/resources/uploads`}
+      scopes={{ session: `This session · ${formatDay(s.startsAt, timeZone)}`, course: `The whole course · ${s.course.name}` }}
+      add={(input) => add.mutateAsync(input)}
+      onClose={onClose}
+      onAdded={onAdded}
+    />
+  )
+}
+
+export type NewResource = { kind: 'file' | 'link'; name: string; url?: string; path?: string; scope: 'session' | 'course'; visible: boolean }
+
+/** The add-resource form, for a session (with a choice of scope) or a whole course in a cohort (pilot feedback, Nov 2026). */
+export function ResourceDialog({
+  description,
+  uploadsEndpoint,
+  scopes,
+  add,
+  onClose,
+  onAdded,
+}: {
+  description: string
+  uploadsEndpoint: string
+  /** Labels for "this session" and "whole course"; leave out for course-only. */
+  scopes?: { session: string; course: string }
+  add: (input: NewResource) => Promise<unknown>
+  onClose: () => void
+  onAdded: (name: string) => void
+}) {
   const input = useRef<HTMLInputElement>(null)
   const [kind, setKind] = useState<'file' | 'link'>('file')
   const [file, setFile] = useState<File | null>(null)
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
-  const [scope, setScope] = useState<'session' | 'course'>('session')
+  const [scope, setScope] = useState<'session' | 'course'>(scopes ? 'session' : 'course')
   const [visible, setVisible] = useState(true)
   const [over, setOver] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -152,8 +183,8 @@ export function AddResourceDialog({ data, onClose, onAdded }: { data: SessionDet
     if (Object.keys(next).length) return
     setBusy(true)
     try {
-      const path = kind === 'file' ? await uploadFile(`/v1/sessions/${s.id}/resources/uploads`, file!) : undefined
-      await add.mutateAsync({ kind, name: title, ...(kind === 'link' ? { url: url.trim() } : { path }), scope, visible })
+      const path = kind === 'file' ? await uploadFile(uploadsEndpoint, file!) : undefined
+      await add({ kind, name: title, ...(kind === 'link' ? { url: url.trim() } : { path }), scope, visible })
       onAdded(title)
     } catch (error) {
       if (error instanceof ApiError && Array.isArray(error.details))
@@ -175,7 +206,7 @@ export function AddResourceDialog({ data, onClose, onAdded }: { data: SessionDet
       open
       onClose={() => !busy && onClose()}
       title="Add a resource"
-      description={`For ${s.course.name} in ${s.cohort.name}.`}
+      description={description}
       actions={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
@@ -243,15 +274,17 @@ export function AddResourceDialog({ data, onClose, onAdded }: { data: SessionDet
           error={errors.name}
           helper={kind === 'file' ? 'Defaults to the file name.' : undefined}
         />
-        <SelectField
-          label="Show on"
-          value={scope}
-          onChange={(e) => setScope(e.target.value as 'session' | 'course')}
-          helper="Or the whole course, so every session shows it."
-        >
-          <option value="session">This session · {formatDay(s.startsAt, timeZone)}</option>
-          <option value="course">The whole course · {s.course.name}</option>
-        </SelectField>
+        {scopes && (
+          <SelectField
+            label="Show on"
+            value={scope}
+            onChange={(e) => setScope(e.target.value as 'session' | 'course')}
+            helper="Or the whole course, so every session shows it."
+          >
+            <option value="session">{scopes.session}</option>
+            <option value="course">{scopes.course}</option>
+          </SelectField>
+        )}
         <Checkbox label="Visible to participants" checked={visible} onChange={(e) => setVisible(e.target.checked)} />
       </form>
     </Dialog>

@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '@/auth/useAuth'
 import { AlertBanner } from '@/components/ui/AlertBanner'
-import { Avatar } from '@/components/ui/Avatar'
+import { ProfilePhoto } from '@/components/profile/ProfilePhoto'
 import { Panel, PanelHeader } from '@/components/ui/Page'
 import { TextField } from '@/components/ui/TextField'
 import { api, ApiError } from '@/lib/api'
 import { formatDay, formatTime } from '@/lib/format'
-import { initials, roleLabel, shortName } from '@/lib/people'
+import { roleLabel, shortName } from '@/lib/people'
 import { supabase } from '@/lib/supabase'
 import { checkPassword } from '@/lib/password-check'
 import { SaveBar } from './SettingsBits'
@@ -128,7 +128,7 @@ export function ProfileSettingsPage() {
             title="Profile"
             description={`Shown to other admins and trainers in ${me?.organisation?.name ?? 'your organisation'}.`}
           />
-          <Avatar size={32} initials={initials(profile.fullName || saved.fullName)} seed={me?.membership.id} />
+          <ProfilePhoto name={profile.fullName || saved.fullName} />
           <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
             <TextField
               label="Full name"

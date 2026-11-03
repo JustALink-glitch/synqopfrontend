@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { forgetPhoto } from '@/lib/photos'
 import { useAuth } from '@/auth/useAuth'
 import { Avatar } from '@/components/ui/Avatar'
 import { api, ApiError } from '@/lib/api'
@@ -29,6 +30,7 @@ export function ProfilePhoto({ name, label = 'Change photo' }: { name: string; l
     try {
       const path = await uploadFile('/v1/me/photo/upload', file)
       await api('/v1/me/photo', { method: 'PUT', body: { path } })
+      if (me?.membership.id) forgetPhoto(me.membership.id)
       await refresh()
     } catch (e) {
       setError(
@@ -49,6 +51,7 @@ export function ProfilePhoto({ name, label = 'Change photo' }: { name: string; l
     setError(null)
     try {
       await api('/v1/me/photo', { method: 'DELETE' })
+      if (me?.membership.id) forgetPhoto(me.membership.id)
       await refresh()
     } catch {
       setError('Your photo wasn’t removed. Try again.')

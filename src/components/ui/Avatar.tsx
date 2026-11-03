@@ -1,4 +1,6 @@
 import clsx from 'clsx'
+import { useState } from 'react'
+import { usePhoto } from '@/lib/photos'
 
 const tones = [
   'bg-brand-subtle text-brand-text',
@@ -17,7 +19,10 @@ function toneFor(seed: string): string {
 
 const sizes = { 24: 'size-6 text-[11px] leading-[14px]', 32: 'size-8 text-caption-strong', 40: 'size-10 text-body-strong' } as const
 
-/** Avatar (Figma 13:70). 24px in table rows, 32px in the top bar and lists, 40px on profile forms. Shows the photo when there is one. */
+/**
+ * Avatar (Figma 13:70). 24px in table rows, 32px in the top bar and lists, 40px on profile forms. Shows the photo when
+ * there is one: pass `src`, or leave it out and the member's photo is looked up from `seed` (their member id).
+ */
 export function Avatar({
   initials,
   seed,
@@ -31,7 +36,19 @@ export function Avatar({
   src?: string | null
   className?: string
 }) {
-  if (src) return <img src={src} alt="" aria-hidden="true" className={clsx('shrink-0 rounded-full object-cover', sizes[size], className)} />
+  const looked = usePhoto(seed, src !== undefined)
+  const photo = src ?? looked
+  const [broken, setBroken] = useState<string | null>(null)
+  if (photo && broken !== photo)
+    return (
+      <img
+        src={photo}
+        alt=""
+        aria-hidden="true"
+        onError={() => setBroken(photo)}
+        className={clsx('shrink-0 rounded-full object-cover', sizes[size], className)}
+      />
+    )
   return (
     <span
       aria-hidden="true"
