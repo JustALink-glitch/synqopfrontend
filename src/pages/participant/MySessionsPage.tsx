@@ -130,7 +130,7 @@ export function MySessionsPage() {
         <>
           <PeriodNav
             unit={view === 'calendar' ? 'month' : 'week'}
-            label={view === 'calendar' ? monthLabel(shownMonth) : `${thisWeek ? 'This week · ' : ''}${weekRange(shownWeek)}`}
+            label={view === 'calendar' ? monthLabel(shownMonth) : weekRange(shownWeek)}
             onMove={(step) => (view === 'calendar' ? setMonth(addMonths(shownMonth, step)) : setWeek(addDays(shownWeek, step * 7)))}
             onToday={() => (view === 'calendar' ? setMonth(monthOf(today)) : setWeek(mondayOf(today)))}
             atToday={view === 'calendar' ? thisMonth : thisWeek}
@@ -145,7 +145,8 @@ export function MySessionsPage() {
                   today={today}
                   timeZone={timeZone}
                   items={sessions.map((s) => ({ ...s, title: s.course.name, cancelled: s.status === 'cancelled' }))}
-                  link={(s) => `${BASE}/${s.id}`}
+                  colourKey={(s) => s.course.id}
+                  colourLabel={(s) => s.course.name}
                   row={line}
                 />
               ) : inWeek.length === 0 ? (

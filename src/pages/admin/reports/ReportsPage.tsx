@@ -12,6 +12,9 @@ import { ChartIcon, ChevronRightIcon, DownloadIcon, FileIcon } from '@/component
 import { EmptyState, FilterChips, PageHeader, Panel } from '@/components/ui/Page'
 import { SearchField } from '@/components/ui/SearchField'
 import { Cell, Row, Stacked, Table, TableFooter, type Column } from '@/components/ui/Table'
+import { TabButtons } from '@/components/ui/Tabs'
+import { kinds, type Kind } from './kinds'
+import { LiveReport } from './LiveReport'
 import { SelectField, TextField } from '@/components/ui/TextField'
 import { api, ApiError, downloadApiFile } from '@/lib/api'
 import { formatDay, formatTime, plural, todayIn } from '@/lib/format'
@@ -19,7 +22,6 @@ import { paginate } from '@/lib/paginate'
 import { initials } from '@/lib/people'
 import { useCohorts, useProgrammes } from '@/pages/admin/programmes/data'
 
-type Kind = 'cohort_summary' | 'programme_summary' | 'attendance' | 'assignments' | 'feedback'
 type Format = 'pdf' | 'csv'
 
 interface Report {
@@ -33,19 +35,6 @@ interface Report {
   createdAt: string
   completedAt: string | null
 }
-
-const kinds: { value: Kind; label: string; description: string; cohort: 'required' | 'optional' | 'none' }[] = [
-  {
-    value: 'cohort_summary',
-    label: 'Cohort summary',
-    description: 'Enrolment, attendance, assignment completion, feedback and Needs attention for one cohort.',
-    cohort: 'required',
-  },
-  { value: 'programme_summary', label: 'Programme summary', description: 'The same measures across every cohort in a programme.', cohort: 'none' },
-  { value: 'attendance', label: 'Attendance', description: 'Session-by-session attendance with present, excused and absent counts.', cohort: 'required' },
-  { value: 'assignments', label: 'Assignments and grades', description: 'Submission and grading status per assignment.', cohort: 'required' },
-  { value: 'feedback', label: 'Feedback', description: 'Post-session feedback, aggregated by session and trainer.', cohort: 'optional' },
-]
 
 type Filter = 'all' | 'summaries' | 'attendance' | 'assignments' | 'feedback'
 const filterOf = (k: Kind): Filter => (k === 'cohort_summary' || k === 'programme_summary' ? 'summaries' : k)
@@ -72,6 +61,7 @@ export function ReportsPage() {
   const [params, setParams] = useSearchParams()
   const [generating, setGenerating] = useState(params.get('generate') === '1')
   const [latest, setLatest] = useState<string | null>(null)
+  const [tab, setTab] = useState<'live' | 'files'>('live')
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -95,7 +85,7 @@ export function ReportsPage() {
     <>
       <PageHeader
         title="Reports"
-        description="Built from data already captured in Synqop, with the same definitions as the dashboard."
+        description="See the figures live, then download them as a PDF or CSV. Same definitions as the dashboard."
         actions={
           <Button icon={<FileIcon size={16} />} onClick={() => setGenerating(true)}>
             Generate report
@@ -119,7 +109,23 @@ export function ReportsPage() {
           Something went wrong on our side and nothing was exported. Try again; if it keeps failing, contact support.
         </AlertBanner>
       )}
-      {query.isPending ? (
+      <TabButtons
+        label="Reports"
+        value={tab}
+        onChange={setTab}
+        items={[
+          { value: 'live', label: 'Live view' },
+          { value: 'files', label: 'Generated files', count: reports.length || undefined },
+        ]}
+      />
+      {tab === 'live' ? (
+        <LiveReport
+          onStarted={(id) => {
+            setLatest(id)
+            void client.invalidateQueries({ queryKey: keys.all })
+          }}
+        />
+      ) : query.isPending ? (
         <Panel aria-busy="true" aria-label="Loading reports" className="h-[240px]">
           <span className="sr-only">Loading reports</span>
         </Panel>

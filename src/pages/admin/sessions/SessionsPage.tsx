@@ -81,7 +81,7 @@ export function SessionsPage() {
         <>
           <PeriodNav
             unit={view === 'calendar' ? 'month' : 'week'}
-            label={view === 'calendar' ? monthLabel(month) : `${thisWeek ? 'This week · ' : ''}${weekRange(week)}`}
+            label={view === 'calendar' ? monthLabel(month) : weekRange(week)}
             onMove={(step) => (view === 'calendar' ? setMonth(addMonths(month, step)) : setWeek(addDays(week, step * 7)))}
             onToday={() => (view === 'calendar' ? setMonth(monthOf(today)) : setWeek(mondayOf(today)))}
             atToday={view === 'calendar' ? thisMonth : thisWeek}
@@ -109,7 +109,8 @@ export function SessionsPage() {
                   today={today}
                   timeZone={timeZone}
                   items={sessions}
-                  link={(s) => `sessions/${s.id}`}
+                  colourKey={(s) => s.course.id}
+                  colourLabel={(s) => s.course.name}
                   row={(s) => <SessionRow key={s.id} session={s} timeZone={timeZone} />}
                 />
               ) : sessions.length === 0 ? (

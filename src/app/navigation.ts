@@ -1,3 +1,4 @@
+import { Megaphone } from 'lucide-react'
 import type { ComponentType, SVGProps } from 'react'
 import {
   BookOpenIcon,
@@ -40,6 +41,7 @@ export const navigation: Record<Area, NavItem[]> = {
     { label: 'Needs attention', path: 'needs-attention', icon: InfoTriangleIcon, screen: 'D1' },
     { label: 'Trainers', path: 'trainers', icon: UserIcon, screen: 'B2' },
     { label: 'Courses & sessions', path: 'courses', icon: BookOpenIcon, screen: 'A2 · C1' },
+    { label: 'Announcements', path: 'announcements', icon: Megaphone, screen: 'G1.03' },
     { label: 'Reports', path: 'reports', icon: ChartIcon, screen: 'E1' },
     { label: 'Settings', path: 'settings', icon: SettingsIcon, screen: 'F1', bottom: true },
   ],
@@ -49,6 +51,7 @@ export const navigation: Record<Area, NavItem[]> = {
     { label: 'Grade assignments', path: 'grading', icon: ClipboardIcon, screen: 'T6.01' },
     { label: 'My sessions', path: 'sessions', icon: BookOpenIcon, screen: 'T3.01' },
     { label: 'My participants', path: 'participants', icon: UserGroupIcon, screen: 'T7.01' },
+    { label: 'Announcements', path: 'announcements', icon: Megaphone, screen: 'G1.03' },
     // Hidden for assistants by default; the org setting (F1.04) can switch it on later.
     { label: 'Session reports', path: 'reports', icon: FileIcon, screen: 'T5.03', hiddenFor: ['assistant_trainer'] },
     { label: 'Settings', path: 'settings', icon: SettingsIcon, screen: 'T9.01', bottom: true },
@@ -59,6 +62,7 @@ export const navigation: Record<Area, NavItem[]> = {
     { label: 'Sessions', path: 'sessions', icon: CalendarIcon, screen: 'P4.01' },
     { label: 'Assignments', path: 'assignments', icon: ClipboardIcon, screen: 'P5.01' },
     { label: 'Grades & feedback', path: 'grades', icon: CheckCircleIcon, screen: 'P6.01' },
+    { label: 'Announcements', path: 'announcements', icon: Megaphone, screen: 'G1.03' },
     { label: 'Settings', path: 'settings', icon: SettingsIcon, screen: 'P8.01', bottom: true },
   ],
 }

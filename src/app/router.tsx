@@ -28,6 +28,7 @@ import { PrivacyPage } from '@/pages/admin/settings/PrivacyPage'
 import { MyCertificatePage, ProgressPage } from '@/pages/participant/ProgressPage'
 import { OverviewPage } from '@/pages/admin/overview/OverviewPage'
 import { ReportsPage } from '@/pages/admin/reports/ReportsPage'
+import { AnnouncementsPage } from '@/pages/announcements/AnnouncementsPage'
 import { InterventionsPage, NeedsAttentionPage } from '@/pages/admin/attention/NeedsAttentionPage'
 import { SessionFeedbackPage } from '@/pages/feedback/SessionFeedbackPage'
 import { MyCohortCourses, MyCohortLayout, MyCohortOverview, MyCohortParticipants, MyCohortSessions, MyCohortsPage } from '@/pages/trainer/MyCohortsPage'
@@ -101,6 +102,7 @@ const built: Partial<Record<Area, RouteObject[]>> = {
     { index: true, element: <OverviewPage /> },
     { path: 'reports', element: <ReportsPage /> },
     { path: 'notifications', element: <NotificationsPage area="admin" /> },
+    { path: 'announcements', element: <AnnouncementsPage area="admin" /> },
     { path: 'search', element: <SearchPage area="admin" /> },
     { path: 'needs-attention', element: <NeedsAttentionPage /> },
     { path: 'needs-attention/interventions', element: <InterventionsPage /> },
@@ -159,6 +161,7 @@ const built: Partial<Record<Area, RouteObject[]>> = {
     { path: 'restricted', element: <AdminOnlyPage /> },
     { path: 'settings', element: <AccountSettingsPage area="trainer" /> },
     { path: 'notifications', element: <NotificationsPage area="trainer" /> },
+    { path: 'announcements', element: <AnnouncementsPage area="trainer" /> },
     { path: 'search', element: <SearchPage area="trainer" /> },
     { path: 'reports', element: <SessionReportsPage /> },
     { path: 'reports/:sessionId', element: <SessionReportPage /> },
@@ -197,6 +200,7 @@ const built: Partial<Record<Area, RouteObject[]>> = {
     { path: 'sessions/:id', element: <MySessionPage /> },
     { path: 'settings', element: <SettingsPage /> },
     { path: 'notifications', element: <NotificationsPage area="participant" /> },
+    { path: 'announcements', element: <AnnouncementsPage area="participant" /> },
     { path: 'search', element: <SearchPage area="participant" /> },
     { path: 'assignments', element: <MyAssignmentsPage /> },
     { path: 'assignments/:id', element: <MyAssignmentPage /> },

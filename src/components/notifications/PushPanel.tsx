@@ -7,7 +7,7 @@ const copy: Record<PushState, string> = {
   on: 'This device shows a notification for everything ticked under In-app, even when Synqop is closed.',
   off: 'Get a notification on this device for everything ticked under In-app, even when Synqop is closed. Email is only for the important things.',
   'needs-install':
-    'On iPhone and iPad, push works once Synqop is on your Home Screen: tap Share, then Add to Home Screen, and open Synqop from there. It needs iOS 16.4 or later.',
+    'On iPhone and iPad, push only works from the Synqop icon on your Home Screen, not from a browser tab. In Safari or Chrome, tap Share, then Add to Home Screen. Open Synqop from that icon, sign in, and turn push on here. It needs iOS 16.4 or later.',
   blocked: 'Notifications are blocked for Synqop in this browser. Allow them in the browser’s site settings, then come back here.',
   unsupported: 'This browser can’t show push notifications. You’ll still see everything in the bell, and important things by email.',
   unavailable: 'Push notifications aren’t switched on for Synqop yet. You’ll still see everything in the bell.',

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { formatDate } from '@/lib/format'
+import { formatDate, plural } from '@/lib/format'
 import { addDays, weekdayOf } from '@/lib/schedule'
 
 export type ScheduleView = 'list' | 'calendar'
@@ -50,4 +50,11 @@ export function useScheduleView(key: string): [ScheduleView, (v: ScheduleView) =
       }
     },
   ]
+}
+
+/** "2 sessions", "No sessions · 1 cancelled". */
+export function dayCount(list: { cancelled?: unknown }[]) {
+  const live = list.filter((s) => !s.cancelled).length
+  const off = list.length - live
+  return [live ? plural(live, 'session') : 'No sessions', off ? `${off} cancelled` : null].filter(Boolean).join(' · ')
 }
