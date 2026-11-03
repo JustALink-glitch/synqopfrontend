@@ -11,6 +11,7 @@ import { TextAreaField, TextField } from '@/components/ui/TextField'
 import { api, ApiError } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { checkPassword } from '@/lib/password-check'
+import { PushPanel } from '@/components/notifications/PushPanel'
 import { useNotificationPreferences, type NotificationPreference } from '@/pages/participant/data'
 
 type Errors = Partial<Record<'fullName' | 'phone' | 'bio' | 'current' | 'next' | 'confirm', string>>
@@ -249,6 +250,8 @@ function SettingsForm({ area, initialPrefs }: { area: Area; initialPrefs: Notifi
             />
           </div>
         </Panel>
+
+        <PushPanel />
 
         <Panel aria-labelledby="notifications-title" className="gap-2">
           <PanelHeader id="notifications-title" title="Notifications" description="Choose how you hear about each event." />

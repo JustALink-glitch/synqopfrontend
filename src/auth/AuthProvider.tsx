@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api, ApiError, onSessionExpired } from '@/lib/api'
 import { hadStoredSession, supabase } from '@/lib/supabase'
+import { forgetPushOnSignOut } from '@/lib/push'
 import { AuthContext, type AuthContextValue, type AuthState, type Me, type NoAccessReason } from './useAuth'
 
 /** 'aal2' once this session has passed two-step sign-in. */
@@ -72,6 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       state,
       signOut: async () => {
         signingOut.current = true
+        // This device stops showing their notifications (shared computers, handed-over phones).
+        await forgetPushOnSignOut()
         await supabase.auth.signOut()
       },
       refresh: async () => {

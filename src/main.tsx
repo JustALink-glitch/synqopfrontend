@@ -7,6 +7,9 @@ import { router } from '@/app/router'
 import { AuthProvider } from '@/auth/AuthProvider'
 import '@/styles/index.css'
 import { ApiError } from '@/lib/api'
+import { registerServiceWorker } from '@/lib/push'
+
+registerServiceWorker()
 
 const queryClient = new QueryClient({
   // Offline (X1.04), saves fail straight away with a connection message instead of waiting silently.

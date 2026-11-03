@@ -5,13 +5,14 @@ import { StatePanel } from '@/components/StatePanel'
 import { AlertBanner } from '@/components/ui/AlertBanner'
 import { Button } from '@/components/ui/Button'
 import { CalendarIcon, ChevronRightIcon } from '@/components/ui/icons'
-import { Badge, EmptyState, FilterChips, PageHeader, Panel, PanelHeader } from '@/components/ui/Page'
-import { formatDate, formatDay, formatTime, localDate, plural } from '@/lib/format'
-import { useSessions, whereLabel, type Session } from '@/pages/admin/sessions/data'
-import { SessionStatusBadge } from '@/pages/admin/sessions/SessionRow'
+import { addMonths, mondayOf, monthGrid, monthLabel, monthOf, useScheduleView, weekRange } from '@/components/sessions/period'
+import { DayGroups, MonthCalendar, PeriodNav, ViewSwitch } from '@/components/sessions/Schedule'
+import { Badge, EmptyState, PageHeader, Panel, PanelHeader } from '@/components/ui/Page'
+import { formatDay, formatTime, plural } from '@/lib/format'
+import { addDays } from '@/lib/schedule'
+import { useSessions, type Session } from '@/pages/admin/sessions/data'
+import { SessionRow } from '@/pages/admin/sessions/SessionRow'
 import { reportState, weeks } from './data'
-
-type Tab = 'this' | 'next' | 'past'
 
 const reportBadge = {
   submitted: { tone: 'success' as const, label: 'Report submitted' },
@@ -26,16 +27,19 @@ export function MySessionsPage() {
   const me = state.status === 'signed-in' ? state.me : null
   const assistant = me?.membership.role === 'assistant_trainer'
   const range = weeks(me?.organisation?.timeZone)
+  // Recent weeks, for past sessions and reports due; the list or calendar asks for its own period.
   const query = useSessions({ from: range.pastFrom, to: range.nextWeek.to })
-  const [tab, setTab] = useState<Tab>('this')
+  const [view, setView] = useScheduleView('trainer')
+  const [week, setWeek] = useState(range.thisWeek.from)
+  const [month, setMonth] = useState(() => monthOf(range.today))
+  const [allPast, setAllPast] = useState(false)
+  const grid = monthGrid(month)
+  const period = useSessions(view === 'calendar' ? { from: grid.from, to: grid.to } : { from: week, to: addDays(week, 6) })
   const timeZone = query.data?.timeZone ?? me?.organisation?.timeZone
   const all = query.data?.sessions ?? []
-  const inWeek = (s: Session, w: { from: string; to: string }) => {
-    const d = localDate(s.startsAt, timeZone)
-    return d >= w.from && d <= w.to
-  }
-  const thisWeek = all.filter((s) => inWeek(s, range.thisWeek))
-  const nextWeek = all.filter((s) => inWeek(s, range.nextWeek))
+  const shown = period.data?.sessions ?? []
+  const thisWeek = week === mondayOf(range.today)
+  const thisMonth = month === monthOf(range.today)
   const past = all.filter((s) => s.status === 'held').reverse()
   const overdue = past.filter((s) => reportState(s) === 'overdue')
   const due = past.filter((s) => reportState(s) === 'due')
@@ -81,36 +85,49 @@ export function MySessionsPage() {
         </Panel>
       ) : (
         <>
-          <FilterChips
-            label="Sessions"
-            value={tab}
-            onChange={setTab}
-            options={[
-              { value: 'this', label: 'This week', count: thisWeek.length },
-              { value: 'next', label: 'Next week', count: nextWeek.length },
-              { value: 'past', label: 'Past', count: past.length },
-            ]}
-          />
+          <PeriodNav
+            unit={view === 'calendar' ? 'month' : 'week'}
+            label={view === 'calendar' ? monthLabel(month) : `${thisWeek ? 'This week · ' : ''}${weekRange(week)}`}
+            onMove={(step) => (view === 'calendar' ? setMonth(addMonths(month, step)) : setWeek(addDays(week, step * 7)))}
+            onToday={() => (view === 'calendar' ? setMonth(monthOf(range.today)) : setWeek(mondayOf(range.today)))}
+            atToday={view === 'calendar' ? thisMonth : thisWeek}
+          >
+            <ViewSwitch value={view} onChange={setView} />
+          </PeriodNav>
           <div className="grid grid-cols-[minmax(0,1fr)_356px] items-start gap-4 max-lg:grid-cols-1">
             <div className="flex min-w-0 flex-col gap-4">
-              {tab === 'past' ? (
-                <PastPanel sessions={past} timeZone={timeZone} title="Past sessions" description="Attendance and your session report for each." />
-              ) : (
-                <WeekPanel
-                  title={`${tab === 'this' ? 'This week' : 'Next week'} · ${formatDate(tab === 'this' ? range.thisWeek.from : range.nextWeek.from).replace(/ \w+$/, '')} – ${formatDate(tab === 'this' ? range.thisWeek.to : range.nextWeek.to)}`}
-                  sessions={tab === 'this' ? thisWeek : nextWeek}
-                  empty={tab === 'this' ? 'No sessions this week.' : 'No sessions next week.'}
-                  today={range.today}
-                  timeZone={timeZone}
-                />
-              )}
-              {tab !== 'past' && past.length > 0 && (
+              <Panel className="gap-4" aria-busy={period.isPending}>
+                {period.isPending ? (
+                  <div className="h-40" />
+                ) : period.isError ? (
+                  <StatePanel
+                    kind="error"
+                    title="Couldn’t load these sessions"
+                    description="Check your connection and try again."
+                    action={{ label: 'Try again', onClick: () => void period.refetch() }}
+                  />
+                ) : view === 'calendar' ? (
+                  <MonthCalendar
+                    month={month}
+                    today={range.today}
+                    timeZone={timeZone}
+                    items={shown}
+                    link={(s) => s.id}
+                    row={(s) => <SessionRow key={s.id} session={s} timeZone={timeZone} />}
+                  />
+                ) : shown.length === 0 ? (
+                  <EmptyState icon={<CalendarIcon size={24} />} title="No sessions this week" body="Use the arrows to see other weeks." />
+                ) : (
+                  <DayGroups items={shown} timeZone={timeZone} today={range.today} row={(s) => <SessionRow key={s.id} session={s} timeZone={timeZone} />} />
+                )}
+              </Panel>
+              {past.length > 0 && (
                 <PastPanel
-                  sessions={past.slice(0, 3)}
+                  sessions={allPast ? past : past.slice(0, 3)}
                   timeZone={timeZone}
-                  title="Recent sessions"
+                  title={allPast ? 'Past sessions' : 'Recent sessions'}
                   description="Attendance and your session report for each."
-                  onAll={() => setTab('past')}
+                  onAll={past.length > 3 && !allPast ? () => setAllPast(true) : undefined}
                 />
               )}
             </div>
@@ -151,59 +168,6 @@ export function MySessionsPage() {
         </>
       )}
     </>
-  )
-}
-
-function WeekPanel({
-  title,
-  sessions,
-  today,
-  timeZone,
-  empty,
-}: {
-  title: string
-  sessions: Session[]
-  today: string
-  timeZone: string | undefined
-  empty: string
-}) {
-  const days = [...new Set(sessions.map((s) => localDate(s.startsAt, timeZone)))]
-  return (
-    <Panel className="gap-0">
-      <PanelHeader title={title} />
-      {sessions.length === 0 ? (
-        <p className="py-4 text-body text-secondary">{empty}</p>
-      ) : (
-        days.map((d) => (
-          <section key={d} className="pt-3">
-            <h3 className="text-caption text-secondary">{d === today ? `Today · ${formatDate(d)}` : formatDate(d)}</h3>
-            <ul>
-              {sessions
-                .filter((s) => localDate(s.startsAt, timeZone) === d)
-                .map((s) => (
-                  <li key={s.id} className="border-b border-default last:border-b-0">
-                    <Link
-                      to={s.id}
-                      className="flex items-center gap-3 py-2.5 hover:bg-surface-hover focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none"
-                    >
-                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="truncate text-body-strong text-primary">
-                          {formatTime(s.startsAt, timeZone)} · {s.course.name}
-                        </span>
-                        <span className="truncate text-caption text-secondary">
-                          {[s.cohort.name, s.number && `Session ${s.number} of ${s.total}`, whereLabel(s)].filter(Boolean).join(' · ')}
-                        </span>
-                      </span>
-                      <SessionStatusBadge status={s.status} />
-                      <ChevronRightIcon size={16} className="shrink-0 text-icon-muted" />
-                    </Link>
-                  </li>
-                ))}
-            </ul>
-          </section>
-        ))
-      )}
-    </Panel>
   )
 }
 

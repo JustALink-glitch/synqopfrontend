@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import type { FormEvent } from 'react'
 import { useAuth } from '@/auth/useAuth'
+import { PushPanel } from '@/components/notifications/PushPanel'
 import { AlertBanner } from '@/components/ui/AlertBanner'
 import { Checkbox } from '@/components/ui/Choice'
 import { Panel, PanelHeader } from '@/components/ui/Page'
@@ -61,6 +62,7 @@ function NotificationsForm({ initial }: { initial: Draft }) {
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
       {form.notice && <AlertBanner tone={form.notice.tone} title={form.notice.title} />}
+      <PushPanel />
       <Panel aria-labelledby="events-title" className="gap-2">
         <PanelHeader id="events-title" title="Events" />
         <table className="w-full">

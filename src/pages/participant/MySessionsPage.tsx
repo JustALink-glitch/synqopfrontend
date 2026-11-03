@@ -10,7 +10,10 @@ import { TextAreaField } from '@/components/ui/TextField'
 import { ApiError } from '@/lib/api'
 import { CalendarIcon, ChevronRightIcon } from '@/components/ui/icons'
 import { EmptyState, PageHeader, Panel, PanelHeader } from '@/components/ui/Page'
-import { formatDay, formatTime, formatTimeRange, plural, relativeDay } from '@/lib/format'
+import { formatDay, formatTime, formatTimeRange, localDate, plural, relativeDay, todayIn } from '@/lib/format'
+import { addDays } from '@/lib/schedule'
+import { addMonths, mondayOf, monthLabel, monthOf, useScheduleView, weekRange } from '@/components/sessions/period'
+import { DayGroups, MonthCalendar, PeriodNav, ScheduleRow, ViewSwitch } from '@/components/sessions/Schedule'
 import { duration, sessionWhere, useMySession, useMySessions, useRateSession, type MySession } from './data'
 import { ResourceRow, SessionBadge } from './SessionBits'
 
@@ -46,9 +49,37 @@ function SessionLink({ s, timeZone, past }: { s: MySession; timeZone: string; pa
   )
 }
 
-/** /participant/sessions — P4.01 Sessions. */
+/** One session in the week list or calendar, in the same shape as the admin and trainer lists. */
+function ScheduleLine({ s, timeZone }: { s: MySession; timeZone: string }) {
+  return (
+    <ScheduleRow
+      to={`${BASE}/${s.id}`}
+      startsAt={s.startsAt}
+      endsAt={s.endsAt}
+      timeZone={timeZone}
+      title={s.course.name}
+      detail={[s.number ? `Session ${s.number} of ${s.total}` : null, s.trainer].filter(Boolean).join(' · ') || null}
+      where={sessionWhere(s)}
+      mode={s.mode}
+      cancelled={s.status === 'cancelled'}
+      note={
+        s.status === 'cancelled' && (
+          <span className="truncate text-caption text-muted">{s.cancellationReason ? `Cancelled — ${s.cancellationReason}` : 'Cancelled'}</span>
+        )
+      }
+      trailing={s.status !== 'scheduled' && s.status !== 'cancelled' && <SessionBadge session={s} />}
+    />
+  )
+}
+
+/** /participant/sessions — P4.01 Sessions: a week list or month calendar, and past attendance. */
 export function MySessionsPage() {
   const query = useMySessions()
+  const [view, setView] = useScheduleView('participant')
+  const today = todayIn(query.data?.timeZone)
+  const [week, setWeek] = useState<string | null>(null)
+  const [month, setMonth] = useState<string | null>(null)
+  const [allPast, setAllPast] = useState(false)
   if (query.isPending) return <div aria-busy="true" aria-label="Loading sessions" className="h-40" />
   if (query.isError) {
     return (
@@ -66,11 +97,16 @@ export function MySessionsPage() {
     )
   }
   const { sessions, attendance: a, timeZone } = query.data
-  const upcoming = sessions.filter((s) => s.status === 'scheduled' || s.status === 'in_progress')
-  const past = sessions
-    .filter((s) => s.status === 'held' || (s.status === 'cancelled' && Date.parse(s.startsAt) <= Date.parse(upcoming[0]?.startsAt ?? s.startsAt)))
-    .reverse()
-  const cancelledAhead = sessions.filter((s) => s.status === 'cancelled' && !past.includes(s))
+  const shownWeek = week ?? mondayOf(today)
+  const shownMonth = month ?? monthOf(today)
+  const inWeek = sessions.filter((s) => {
+    const d = localDate(s.startsAt, timeZone)
+    return d >= shownWeek && d <= addDays(shownWeek, 6)
+  })
+  const past = sessions.filter((s) => s.status === 'held').reverse()
+  const thisWeek = shownWeek === mondayOf(today)
+  const thisMonth = shownMonth === monthOf(today)
+  const line = (s: MySession) => <ScheduleLine key={s.id} s={s} timeZone={timeZone} />
 
   return (
     <>
@@ -91,34 +127,59 @@ export function MySessionsPage() {
           />
         </Panel>
       ) : (
-        <div className="grid grid-cols-2 items-start gap-4 max-lg:grid-cols-1">
-          <Panel aria-labelledby="upcoming-title" className="gap-1">
-            <PanelHeader id="upcoming-title" title="Coming up" />
-            {upcoming.length === 0 && cancelledAhead.length === 0 ? (
-              <p className="py-3 text-body text-secondary">Nothing else scheduled.</p>
-            ) : (
-              <ul>
-                {[...upcoming, ...cancelledAhead]
-                  .sort((x, y) => Date.parse(x.startsAt) - Date.parse(y.startsAt))
-                  .map((s) => (
-                    <SessionLink key={s.id} s={s} timeZone={timeZone} />
+        <>
+          <PeriodNav
+            unit={view === 'calendar' ? 'month' : 'week'}
+            label={view === 'calendar' ? monthLabel(shownMonth) : `${thisWeek ? 'This week · ' : ''}${weekRange(shownWeek)}`}
+            onMove={(step) => (view === 'calendar' ? setMonth(addMonths(shownMonth, step)) : setWeek(addDays(shownWeek, step * 7)))}
+            onToday={() => (view === 'calendar' ? setMonth(monthOf(today)) : setWeek(mondayOf(today)))}
+            atToday={view === 'calendar' ? thisMonth : thisWeek}
+          >
+            <ViewSwitch value={view} onChange={setView} />
+          </PeriodNav>
+          <div className="grid grid-cols-[minmax(0,1fr)_356px] items-start gap-4 max-lg:grid-cols-1">
+            <Panel className="min-w-0 gap-4">
+              {view === 'calendar' ? (
+                <MonthCalendar
+                  month={shownMonth}
+                  today={today}
+                  timeZone={timeZone}
+                  items={sessions.map((s) => ({ ...s, title: s.course.name, cancelled: s.status === 'cancelled' }))}
+                  link={(s) => `${BASE}/${s.id}`}
+                  row={line}
+                />
+              ) : inWeek.length === 0 ? (
+                <EmptyState icon={<CalendarIcon size={24} />} title="No sessions this week" body="Use the arrows to see other weeks." />
+              ) : (
+                <DayGroups items={inWeek.map((s) => ({ ...s, cancelled: s.status === 'cancelled' }))} timeZone={timeZone} today={today} row={line} />
+              )}
+            </Panel>
+            <Panel aria-labelledby="past-title" className="gap-1">
+              <div className="flex items-start justify-between gap-3">
+                <PanelHeader id="past-title" title="Past sessions" description="Your attendance as recorded." />
+                {past.length > 5 && !allPast && (
+                  <button
+                    type="button"
+                    onClick={() => setAllPast(true)}
+                    className="inline-flex h-7 shrink-0 items-center gap-1 text-caption-strong text-brand-text hover:underline"
+                  >
+                    All past
+                    <ChevronRightIcon size={14} />
+                  </button>
+                )}
+              </div>
+              {past.length === 0 ? (
+                <p className="py-3 text-body text-secondary">None yet.</p>
+              ) : (
+                <ul>
+                  {(allPast ? past : past.slice(0, 5)).map((s) => (
+                    <SessionLink key={s.id} s={s} timeZone={timeZone} past />
                   ))}
-              </ul>
-            )}
-          </Panel>
-          <Panel aria-labelledby="past-title" className="gap-1">
-            <PanelHeader id="past-title" title="Past sessions" description="Your attendance as recorded." />
-            {past.length === 0 ? (
-              <p className="py-3 text-body text-secondary">None yet.</p>
-            ) : (
-              <ul>
-                {past.map((s) => (
-                  <SessionLink key={s.id} s={s} timeZone={timeZone} past />
-                ))}
-              </ul>
-            )}
-          </Panel>
-        </div>
+                </ul>
+              )}
+            </Panel>
+          </div>
+        </>
       )}
     </>
   )

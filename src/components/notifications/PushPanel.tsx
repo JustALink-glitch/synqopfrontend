@@ -1,0 +1,73 @@
+import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/Button'
+import { Badge, Panel, PanelHeader } from '@/components/ui/Page'
+import { pushState, turnOffPush, turnOnPush, type PushState } from '@/lib/push'
+
+const copy: Record<PushState, string> = {
+  on: 'This device shows a notification for everything ticked under In-app, even when Synqop is closed.',
+  off: 'Get a notification on this device for everything ticked under In-app, even when Synqop is closed. Email is only for the important things.',
+  'needs-install':
+    'On iPhone and iPad, push works once Synqop is on your Home Screen: tap Share, then Add to Home Screen, and open Synqop from there. It needs iOS 16.4 or later.',
+  blocked: 'Notifications are blocked for Synqop in this browser. Allow them in the browser’s site settings, then come back here.',
+  unsupported: 'This browser can’t show push notifications. You’ll still see everything in the bell, and important things by email.',
+  unavailable: 'Push notifications aren’t switched on for Synqop yet. You’ll still see everything in the bell.',
+}
+
+/** Push on this device (G1.01): one switch per browser or phone; which events comes from the In-app column. */
+export function PushPanel() {
+  const [state, setState] = useState<PushState | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
+
+  useEffect(() => {
+    let live = true
+    pushState().then(
+      (s) => live && setState(s),
+      () => live && setState('unsupported'),
+    )
+    return () => {
+      live = false
+    }
+  }, [])
+
+  async function run(action: () => Promise<PushState>) {
+    setBusy(true)
+    setProblem(null)
+    try {
+      setState(await action())
+    } catch {
+      setProblem('Couldn’t change push notifications on this device. Try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!state) return null
+  return (
+    <Panel aria-labelledby="push-title" className="gap-3">
+      <div className="flex items-start justify-between gap-3">
+        <PanelHeader id="push-title" title="Push notifications on this device" />
+        {state === 'on' && <Badge tone="success">On</Badge>}
+      </div>
+      <p className="text-body text-secondary">{copy[state]}</p>
+      {problem && (
+        <p role="alert" className="text-caption text-error-fg">
+          {problem}
+        </p>
+      )}
+      {(state === 'on' || state === 'off') && (
+        <div>
+          {state === 'off' ? (
+            <Button onClick={() => void run(turnOnPush)} disabled={busy}>
+              {busy ? 'Turning on…' : 'Turn on push notifications'}
+            </Button>
+          ) : (
+            <Button variant="secondary" onClick={() => void run(turnOffPush)} disabled={busy}>
+              {busy ? 'Turning off…' : 'Turn off on this device'}
+            </Button>
+          )}
+        </div>
+      )}
+    </Panel>
+  )
+}
