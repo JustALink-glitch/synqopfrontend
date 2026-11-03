@@ -1,4 +1,7 @@
+import { Award, CalendarClock } from 'lucide-react'
 import { useState } from 'react'
+import { CardGrid, ItemCard, LayoutSwitch } from '@/components/collection/Collection'
+import { GRID_PANEL, useLayout } from '@/components/collection/layout'
 import { Link } from 'react-router'
 import { StatePanel } from '@/components/StatePanel'
 import { ChevronRightIcon, ClipboardIcon } from '@/components/ui/icons'
@@ -29,12 +32,16 @@ export function MyStatusBadge({ status }: { status: MyStatus }) {
   return <Badge tone={myStatusTone[status]}>{myStatusLabel[status]}</Badge>
 }
 
+const dot = (s: MyStatus) =>
+  s === 'overdue' ? 'var(--chart-5)' : s === 'not_submitted' ? 'var(--chart-3)' : s === 'graded' ? 'var(--chart-6)' : 'var(--chart-1)'
+
 const gradeCell = (a: MyAssignment) => a.grade ?? (a.status === 'submitted' || a.status === 'late' ? 'Waiting' : null)
 
 /** /participant/assignments — P5.01 Assignments, P5.01e empty. */
 export function MyAssignmentsPage() {
   const query = useMyAssignments()
   const [filter, setFilter] = useState<Filter>('all')
+  const [layout, setLayout] = useLayout('my-assignments')
   const all = query.data?.assignments ?? []
   const timeZone = query.data?.timeZone
   // To do first (soonest due), then the rest, most recent first.
@@ -78,24 +85,74 @@ export function MyAssignmentsPage() {
         </Panel>
       ) : (
         <>
-          <FilterChips
-            label="Assignments"
-            value={filter}
-            onChange={setFilter}
-            options={[
-              { value: 'all', label: 'All', count: all.length },
-              { value: 'todo', label: 'To do', count: all.filter((a) => matches('todo', a)).length },
-              { value: 'submitted', label: 'Submitted', count: all.filter((a) => matches('submitted', a)).length },
-              { value: 'graded', label: 'Graded', count: all.filter((a) => matches('graded', a)).length },
-            ]}
-          />
-          <Panel className="gap-0 max-md:py-2">
+          <div className="flex items-center gap-3 max-md:flex-col max-md:items-stretch">
+            <div className="min-w-0 flex-1">
+              <FilterChips
+                label="Assignments"
+                value={filter}
+                onChange={setFilter}
+                options={[
+                  { value: 'all', label: 'All', count: all.length },
+                  {
+                    value: 'todo',
+                    label: 'To do',
+                    count: all.filter((a) => matches('todo', a)).length,
+                  },
+                  {
+                    value: 'submitted',
+                    label: 'Submitted',
+                    count: all.filter((a) => matches('submitted', a)).length,
+                  },
+                  {
+                    value: 'graded',
+                    label: 'Graded',
+                    count: all.filter((a) => matches('graded', a)).length,
+                  },
+                ]}
+              />
+            </div>
+            <LayoutSwitch value={layout} onChange={setLayout} />
+          </div>
+          <Panel className={layout === 'grid' && visible.length > 0 ? GRID_PANEL : 'gap-0 max-md:py-2'}>
             {visible.length === 0 ? (
               <StatePanel
                 kind="no-results"
                 title={filter === 'todo' ? 'Nothing to do right now' : 'Nothing here'}
                 description={filter === 'todo' ? 'You’re up to date.' : 'Try another filter.'}
               />
+            ) : layout === 'grid' ? (
+              <CardGrid label="Assignments">
+                {visible.map((a) => (
+                  <ItemCard
+                    key={a.id}
+                    to={a.id}
+                    title={a.title}
+                    description={[a.course.name, a.trainer].filter(Boolean).join(' · ')}
+                    accent={dot(a.status)}
+                    badge={<MyStatusBadge status={a.status} />}
+                    meta={[
+                      {
+                        icon: <CalendarClock />,
+                        text: `Due ${formatDue(a.dueAt, timeZone)}`,
+                        label: 'Due',
+                      },
+                      {
+                        icon: <Award />,
+                        text: gradeCell(a) ?? a.scaleLabel,
+                        label: a.grade ? 'Grade' : 'Scale',
+                      },
+                    ]}
+                    footer={
+                      TODO.includes(a.status) ? (
+                        <span className="ml-auto inline-flex items-center gap-1 text-caption-strong text-brand-text">
+                          Submit
+                          <ChevronRightIcon size={14} />
+                        </span>
+                      ) : undefined
+                    }
+                  />
+                ))}
+              </CardGrid>
             ) : (
               <>
                 <div className="max-md:hidden">
@@ -146,7 +203,13 @@ export function MyAssignmentsPage() {
                 </ul>
               </>
             )}
-            <footer className="border-t border-default pt-3 text-caption text-secondary">{plural(visible.length, 'assignment')}</footer>
+            <footer
+              className={
+                layout === 'grid' && visible.length > 0 ? 'pt-1 text-caption text-secondary' : 'border-t border-default pt-3 text-caption text-secondary'
+              }
+            >
+              {plural(visible.length, 'assignment')}
+            </footer>
           </Panel>
         </>
       )}

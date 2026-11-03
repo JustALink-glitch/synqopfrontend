@@ -53,8 +53,14 @@ const toBytes = (base64: string) => {
 }
 
 const save = (sub: PushSubscription) => {
-  const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } }
-  return api('/v1/notifications/push/subscription', { method: 'PUT', body: { endpoint: json.endpoint, keys: json.keys } })
+  const json = sub.toJSON() as {
+    endpoint: string
+    keys: { p256dh: string; auth: string }
+  }
+  return api('/v1/notifications/push/subscription', {
+    method: 'PUT',
+    body: { endpoint: json.endpoint, keys: json.keys },
+  })
 }
 
 /** Asks the browser, then saves this device. Must run from a tap (iOS refuses otherwise). */
@@ -65,15 +71,31 @@ export async function turnOnPush(): Promise<PushState> {
   if (!k) return 'unavailable'
   const reg = (await navigator.serviceWorker.getRegistration('/')) ?? (await navigator.serviceWorker.register('/sw.js'))
   await navigator.serviceWorker.ready
-  const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: toBytes(k) }))
+  const sub =
+    (await reg.pushManager.getSubscription()) ??
+    (await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: toBytes(k),
+    }))
   await save(sub)
   return 'on'
+}
+
+/** Sends a test notification to this device. 'gone' means the browser dropped it: turn push on again. */
+export async function sendTestPush(): Promise<'sent' | 'gone' | 'failed'> {
+  const sub = await subscription()
+  if (!sub) return 'gone'
+  const r = await api<{ result: 'sent' | 'gone' | 'failed' }>('/v1/notifications/push/test', { method: 'POST', body: { endpoint: sub.endpoint } })
+  return r.result
 }
 
 export async function turnOffPush(): Promise<PushState> {
   const sub = await subscription()
   if (sub) {
-    await api('/v1/notifications/push/subscription', { method: 'DELETE', body: { endpoint: sub.endpoint } }).catch(() => {})
+    await api('/v1/notifications/push/subscription', {
+      method: 'DELETE',
+      body: { endpoint: sub.endpoint },
+    }).catch(() => {})
     await sub.unsubscribe().catch(() => {})
   }
   return 'off'
@@ -86,7 +108,10 @@ export async function forgetPushOnSignOut() {
     const sub = await subscription()
     if (!sub) return
     await Promise.race([
-      api('/v1/notifications/push/subscription', { method: 'DELETE', body: { endpoint: sub.endpoint } }),
+      api('/v1/notifications/push/subscription', {
+        method: 'DELETE',
+        body: { endpoint: sub.endpoint },
+      }),
       new Promise((r) => setTimeout(r, 1500)),
     ])
     await sub.unsubscribe()

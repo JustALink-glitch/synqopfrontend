@@ -1,4 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
+import { CalendarDays, Clock, Percent as PercentIcon, Users } from 'lucide-react'
+import { CardGrid, ItemCard, LayoutSwitch } from '@/components/collection/Collection'
+import { GRID_PANEL, useLayout } from '@/components/collection/layout'
 import { CourseResourcesPanel } from '@/components/resources/CourseResourcesPanel'
 import { Link, Outlet, useNavigate, useOutletContext, useParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
@@ -45,10 +48,22 @@ export function MyCohortsPage() {
   const delivery = (r: (typeof rows)[number]) =>
     `${r.course.lead ? 'Lead' : 'Assistant'} · ${r.course.planned ? `${r.course.held} of ${r.course.planned} held` : plural(r.course.held, 'session') + ' held'}${r.status === 'completed' ? ' · finished' : ''}`
   const next = (at: string | null) => (at ? `${relativeDay(at, timeZone)}, ${formatTime(at, timeZone)}` : '—')
+  const [layout, setLayout] = useLayout('trainer-cohorts')
 
   return (
     <>
-      <PageHeader title="My cohorts" description="Cohorts where you teach at least one course." />
+      <PageHeader
+        title="My cohorts"
+        description="Cohorts where you teach at least one course."
+        actions={
+          rows.length > 0 ? (
+            // Phones stretch header actions; keep the switch its own size, on the right.
+            <div className="flex items-center justify-end">
+              <LayoutSwitch value={layout} onChange={setLayout} />
+            </div>
+          ) : undefined
+        }
+      />
       {query.isPending ? (
         <Panel aria-busy="true" aria-label="Loading cohorts" className="h-[200px]">
           <span className="sr-only">Loading cohorts</span>
@@ -72,55 +87,104 @@ export function MyCohortsPage() {
         </Panel>
       ) : (
         <>
-          <Panel className="gap-0 max-md:py-2">
-            <div className="max-md:hidden">
-              <Table columns={columns}>
+          {layout === 'grid' ? (
+            <Panel className={GRID_PANEL}>
+              <CardGrid label="My cohorts">
                 {rows.map((r) => (
-                  <Row key={`${r.id}-${r.course.name}`} to={r.id}>
-                    <Cell>
-                      <Stacked primary={r.name} secondary={r.programme} />
-                    </Cell>
-                    <Cell>
-                      <Stacked primary={r.course.name} secondary={delivery(r)} />
-                    </Cell>
-                    <Cell align="right" hideBelow="lg" className="tabular-nums">
-                      {r.participants}
-                    </Cell>
-                    <Cell align="right">
-                      <Percent value={r.attendance} />
-                    </Cell>
-                    <Cell hideBelow="xl">{next(r.nextSessionAt)}</Cell>
-                    <Cell hideBelow="lg">
-                      <Badge tone={statusBadge[r.status]?.tone ?? 'neutral'}>{statusBadge[r.status]?.label ?? r.status}</Badge>
-                    </Cell>
-                    <Cell align="right">
-                      <Link to={r.id} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-caption-strong text-brand-text">
-                        Open
-                        <ChevronRightIcon size={14} />
-                      </Link>
-                    </Cell>
-                  </Row>
+                  <ItemCard
+                    key={`${r.id}-${r.course.name}`}
+                    to={r.id}
+                    title={r.name}
+                    description={`${r.course.name} · ${r.programme}`}
+                    badge={
+                      <>
+                        <Badge tone={statusBadge[r.status]?.tone ?? 'neutral'}>{statusBadge[r.status]?.label ?? r.status}</Badge>
+                        <Badge tone="neutral">{r.course.lead ? 'Lead' : 'Assistant'}</Badge>
+                      </>
+                    }
+                    progress={{
+                      label: 'Sessions delivered',
+                      value: r.course.planned ? Math.round((r.course.held / r.course.planned) * 100) : null,
+                      text: r.course.planned ? `${r.course.held} of ${r.course.planned}` : `${r.course.held} held`,
+                    }}
+                    meta={[
+                      {
+                        icon: <Users />,
+                        text: r.participants,
+                        label: 'Participants',
+                      },
+                      {
+                        icon: <PercentIcon />,
+                        text: r.attendance === null ? '—' : `${r.attendance}%`,
+                        label: 'Attendance',
+                      },
+                      r.nextSessionAt
+                        ? {
+                            icon: <Clock />,
+                            text: next(r.nextSessionAt),
+                            label: 'Next session',
+                          }
+                        : {
+                            icon: <CalendarDays />,
+                            text: formatDateRange(r.startsOn, r.endsOn),
+                            label: 'Dates',
+                          },
+                    ]}
+                  />
                 ))}
-              </Table>
-            </div>
-            <ul className="md:hidden">
-              {rows.map((r) => (
-                <li key={`${r.id}-${r.course.name}`} className="border-b border-default last:border-b-0">
-                  <Link to={r.id} className="flex items-center gap-3 py-3">
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="truncate text-body-strong text-primary">{r.name}</span>
-                      <span className="truncate text-caption text-secondary">
-                        {r.course.name} · {delivery(r)}
+              </CardGrid>
+            </Panel>
+          ) : (
+            <Panel className="gap-0 max-md:py-2">
+              <div className="max-md:hidden">
+                <Table columns={columns}>
+                  {rows.map((r) => (
+                    <Row key={`${r.id}-${r.course.name}`} to={r.id}>
+                      <Cell>
+                        <Stacked primary={r.name} secondary={r.programme} />
+                      </Cell>
+                      <Cell>
+                        <Stacked primary={r.course.name} secondary={delivery(r)} />
+                      </Cell>
+                      <Cell align="right" hideBelow="lg" className="tabular-nums">
+                        {r.participants}
+                      </Cell>
+                      <Cell align="right">
+                        <Percent value={r.attendance} />
+                      </Cell>
+                      <Cell hideBelow="xl">{next(r.nextSessionAt)}</Cell>
+                      <Cell hideBelow="lg">
+                        <Badge tone={statusBadge[r.status]?.tone ?? 'neutral'}>{statusBadge[r.status]?.label ?? r.status}</Badge>
+                      </Cell>
+                      <Cell align="right">
+                        <Link to={r.id} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-caption-strong text-brand-text">
+                          Open
+                          <ChevronRightIcon size={14} />
+                        </Link>
+                      </Cell>
+                    </Row>
+                  ))}
+                </Table>
+              </div>
+              <ul className="md:hidden">
+                {rows.map((r) => (
+                  <li key={`${r.id}-${r.course.name}`} className="border-b border-default last:border-b-0">
+                    <Link to={r.id} className="flex items-center gap-3 py-3">
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate text-body-strong text-primary">{r.name}</span>
+                        <span className="truncate text-caption text-secondary">
+                          {r.course.name} · {delivery(r)}
+                        </span>
+                        <span className="text-caption text-secondary">Next: {next(r.nextSessionAt)}</span>
                       </span>
-                      <span className="text-caption text-secondary">Next: {next(r.nextSessionAt)}</span>
-                    </span>
-                    <Badge tone={statusBadge[r.status]?.tone ?? 'neutral'}>{statusBadge[r.status]?.label ?? r.status}</Badge>
-                    <ChevronRightIcon size={16} className="shrink-0 text-icon-muted" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Panel>
+                      <Badge tone={statusBadge[r.status]?.tone ?? 'neutral'}>{statusBadge[r.status]?.label ?? r.status}</Badge>
+                      <ChevronRightIcon size={16} className="shrink-0 text-icon-muted" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          )}
           <p className="text-caption text-secondary">You only see cohorts you’re assigned to. Ask an admin to add you to another.</p>
         </>
       )}
@@ -149,14 +213,20 @@ export function MyCohortLayout() {
               kind="restricted"
               title="You’re not assigned to this cohort"
               description="It’s taught by another trainer, so its participants and grades aren’t visible to you. Ask a programme admin if you should have access."
-              action={{ label: 'Back to my cohorts', onClick: () => navigate('/trainer/cohorts') }}
+              action={{
+                label: 'Back to my cohorts',
+                onClick: () => navigate('/trainer/cohorts'),
+              }}
             />
           ) : (
             <StatePanel
               kind="error"
               title="Something went wrong"
               description="Check your connection and try again."
-              action={{ label: 'Try again', onClick: () => void query.refetch() }}
+              action={{
+                label: 'Try again',
+                onClick: () => void query.refetch(),
+              }}
             />
           )}
         </Panel>
@@ -185,9 +255,17 @@ export function MyCohortLayout() {
         label="Cohort"
         items={[
           { label: 'Overview', to: `/trainer/cohorts/${cohort.id}`, end: true },
-          { label: 'Participants', to: `/trainer/cohorts/${cohort.id}/participants`, count: cohort.participants },
+          {
+            label: 'Participants',
+            to: `/trainer/cohorts/${cohort.id}/participants`,
+            count: cohort.participants,
+          },
           { label: 'Sessions', to: `/trainer/cohorts/${cohort.id}/sessions` },
-          { label: 'Courses', to: `/trainer/cohorts/${cohort.id}/courses`, count: courses.length },
+          {
+            label: 'Courses',
+            to: `/trainer/cohorts/${cohort.id}/courses`,
+            count: courses.length,
+          },
         ]}
       />
       <Outlet context={{ data: query.data } satisfies Context} />
@@ -195,8 +273,16 @@ export function MyCohortLayout() {
   )
 }
 
-const signalTone = { attendance: 'warning', assignments: 'warning', activity: 'neutral' } as const
-const signalName = { attendance: 'Attendance', assignments: 'Assignments', activity: 'Activity' } as const
+const signalTone = {
+  attendance: 'warning',
+  assignments: 'warning',
+  activity: 'neutral',
+} as const
+const signalName = {
+  attendance: 'Attendance',
+  assignments: 'Assignments',
+  activity: 'Activity',
+} as const
 
 /** T3.05 Overview. */
 export function MyCohortOverview() {
@@ -206,7 +292,15 @@ export function MyCohortOverview() {
   const rows = (attention.data?.participants ?? []).filter((r) => r.cohort.id === cohort.id)
   const trainers = [
     ...new Map(
-      courses.flatMap((c) => c.trainers.map((t) => [t.id, { ...t, courses: courses.filter((x) => x.trainers.some((y) => y.id === t.id)).map((x) => x.name) }])),
+      courses.flatMap((c) =>
+        c.trainers.map((t) => [
+          t.id,
+          {
+            ...t,
+            courses: courses.filter((x) => x.trainers.some((y) => y.id === t.id)).map((x) => x.name),
+          },
+        ]),
+      ),
     ).values(),
   ]
 
@@ -214,7 +308,12 @@ export function MyCohortOverview() {
     <>
       <Metrics
         items={[
-          { label: 'Participants', icon: <UserGroupIcon size={18} />, value: cohort.participants, context: 'Enrolled in this cohort' },
+          {
+            label: 'Participants',
+            icon: <UserGroupIcon size={18} />,
+            value: cohort.participants,
+            context: 'Enrolled in this cohort',
+          },
           {
             label: 'Delivery',
             icon: <CalendarIcon size={18} />,

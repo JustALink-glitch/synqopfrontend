@@ -1,4 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
+import { ClipboardCheck, Clock } from 'lucide-react'
+import { CardGrid, ItemCard, LayoutSwitch } from '@/components/collection/Collection'
+import { GRID_PANEL, useLayout } from '@/components/collection/layout'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { StatePanel } from '@/components/StatePanel'
@@ -52,6 +55,8 @@ export function MyParticipantsPage() {
   const cohorts = [...new Map(all.map((r) => [r.cohort.id, r.cohort.name])).entries()]
   const visible = all.filter((r) => filter === 'all' || (filter === 'flagged' ? r.flag : r.cohort.id === filter))
   const paged = paginate(visible, page)
+  const [layout, setLayout] = useLayout('trainer-participants')
+  const flagBadge = (r: Row_) => (r.flag ? <Badge tone={r.flag === 'inactive' ? 'neutral' : 'warning'}>{ruleLabel[r.flag]}</Badge> : undefined)
 
   return (
     <>
@@ -77,69 +82,120 @@ export function MyParticipantsPage() {
         </Panel>
       ) : (
         <>
-          <FilterChips
-            label="Participants"
-            value={filter}
-            onChange={(v) => {
-              setFilter(v)
-              setPage(1)
-            }}
-            options={[
-              { value: 'all', label: 'All', count: all.length },
-              { value: 'flagged', label: 'Needs attention', count: all.filter((r) => r.flag).length },
-              ...(cohorts.length > 1 ? cohorts.map(([id, n]) => ({ value: id, label: n, count: all.filter((r) => r.cohort.id === id).length })) : []),
-            ]}
-          />
-          <Panel className="gap-0 max-md:py-2">
-            <div className="max-md:hidden">
-              <Table columns={columns}>
-                {paged.rows.map((r) => (
-                  <Row key={`${r.id}-${r.cohort.id}`} to={r.id}>
-                    <Cell>
-                      <span className="flex min-w-0 items-center gap-2">
-                        <Avatar initials={initials(r.name)} seed={r.id} />
-                        <span className="truncate text-body-strong">{r.name}</span>
-                      </span>
-                    </Cell>
-                    <Cell hideBelow="lg">{r.cohort.name}</Cell>
-                    <Cell align="right">
-                      <Percent value={r.attendance?.rate} />
-                    </Cell>
-                    <Cell align="right">{r.work.published ? `${r.work.submitted} of ${r.work.published}` : <span className="text-muted">—</span>}</Cell>
-                    <Cell>
-                      {r.flag ? <Badge tone={r.flag === 'inactive' ? 'neutral' : 'warning'}>{ruleLabel[r.flag]}</Badge> : <span className="text-muted">—</span>}
-                    </Cell>
-                    <Cell hideBelow="xl">{r.lastActive ? relativeDay(r.lastActive, timeZone) : <span className="text-muted">Never</span>}</Cell>
-                    <Cell align="right">
-                      <Link
-                        to={r.id}
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 text-caption-strong text-brand-text hover:underline"
-                      >
-                        View
-                        <ChevronRightIcon size={14} />
-                      </Link>
-                    </Cell>
-                  </Row>
-                ))}
-              </Table>
+          <div className="flex items-center gap-3 max-md:flex-col max-md:items-stretch">
+            <div className="min-w-0 flex-1">
+              <FilterChips
+                label="Participants"
+                value={filter}
+                onChange={(v) => {
+                  setFilter(v)
+                  setPage(1)
+                }}
+                options={[
+                  { value: 'all', label: 'All', count: all.length },
+                  {
+                    value: 'flagged',
+                    label: 'Needs attention',
+                    count: all.filter((r) => r.flag).length,
+                  },
+                  ...(cohorts.length > 1
+                    ? cohorts.map(([id, n]) => ({
+                        value: id,
+                        label: n,
+                        count: all.filter((r) => r.cohort.id === id).length,
+                      }))
+                    : []),
+                ]}
+              />
             </div>
-            <ul className="md:hidden">
-              {paged.rows.map((r) => (
-                <li key={`${r.id}-${r.cohort.id}`} className="border-b border-default last:border-b-0">
-                  <Link to={r.id} className="flex items-center gap-3 py-3">
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="truncate text-body-strong text-primary">{r.name}</span>
-                      <span className="truncate text-caption text-secondary">
-                        {[r.cohort.name, r.attendance ? `${r.attendance.rate}% attendance` : null].filter(Boolean).join(' · ')}
-                      </span>
-                    </span>
-                    {r.flag && <Badge tone={r.flag === 'inactive' ? 'neutral' : 'warning'}>{ruleLabel[r.flag]}</Badge>}
-                    <ChevronRightIcon size={16} className="shrink-0 text-icon-muted" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <LayoutSwitch value={layout} onChange={setLayout} />
+          </div>
+          <Panel className={layout === 'grid' ? GRID_PANEL : 'gap-0 max-md:py-2'}>
+            {layout === 'grid' ? (
+              <CardGrid label="My participants">
+                {paged.rows.map((r) => (
+                  <ItemCard
+                    key={`${r.id}-${r.cohort.id}`}
+                    to={r.id}
+                    title={r.name}
+                    description={r.cohort.name}
+                    leading={<Avatar size={24} initials={initials(r.name)} seed={r.id} />}
+                    badge={flagBadge(r)}
+                    progress={{
+                      label: 'Attendance in your course',
+                      value: r.attendance?.rate ?? null,
+                    }}
+                    meta={[
+                      {
+                        icon: <ClipboardCheck />,
+                        text: r.work.published ? `${r.work.submitted} of ${r.work.published} handed in` : 'Nothing due yet',
+                      },
+                      {
+                        icon: <Clock />,
+                        text: r.lastActive ? relativeDay(r.lastActive, timeZone) : 'Never signed in',
+                        label: 'Last active',
+                      },
+                    ]}
+                  />
+                ))}
+              </CardGrid>
+            ) : (
+              <>
+                <div className="max-md:hidden">
+                  <Table columns={columns}>
+                    {paged.rows.map((r) => (
+                      <Row key={`${r.id}-${r.cohort.id}`} to={r.id}>
+                        <Cell>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <Avatar initials={initials(r.name)} seed={r.id} />
+                            <span className="truncate text-body-strong">{r.name}</span>
+                          </span>
+                        </Cell>
+                        <Cell hideBelow="lg">{r.cohort.name}</Cell>
+                        <Cell align="right">
+                          <Percent value={r.attendance?.rate} />
+                        </Cell>
+                        <Cell align="right">{r.work.published ? `${r.work.submitted} of ${r.work.published}` : <span className="text-muted">—</span>}</Cell>
+                        <Cell>
+                          {r.flag ? (
+                            <Badge tone={r.flag === 'inactive' ? 'neutral' : 'warning'}>{ruleLabel[r.flag]}</Badge>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </Cell>
+                        <Cell hideBelow="xl">{r.lastActive ? relativeDay(r.lastActive, timeZone) : <span className="text-muted">Never</span>}</Cell>
+                        <Cell align="right">
+                          <Link
+                            to={r.id}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-caption-strong text-brand-text hover:underline"
+                          >
+                            View
+                            <ChevronRightIcon size={14} />
+                          </Link>
+                        </Cell>
+                      </Row>
+                    ))}
+                  </Table>
+                </div>
+                <ul className="md:hidden">
+                  {paged.rows.map((r) => (
+                    <li key={`${r.id}-${r.cohort.id}`} className="border-b border-default last:border-b-0">
+                      <Link to={r.id} className="flex items-center gap-3 py-3">
+                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span className="truncate text-body-strong text-primary">{r.name}</span>
+                          <span className="truncate text-caption text-secondary">
+                            {[r.cohort.name, r.attendance ? `${r.attendance.rate}% attendance` : null].filter(Boolean).join(' · ')}
+                          </span>
+                        </span>
+                        {r.flag && <Badge tone={r.flag === 'inactive' ? 'neutral' : 'warning'}>{ruleLabel[r.flag]}</Badge>}
+                        <ChevronRightIcon size={16} className="shrink-0 text-icon-muted" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
             <TableFooter summary={plural(visible.length, 'participant')} page={paged.page} pageCount={paged.pageCount} onPage={setPage} />
           </Panel>
         </>
@@ -150,17 +206,44 @@ export function MyParticipantsPage() {
 
 interface TrainerParticipant {
   timeZone: string
-  participant: { id: string; name: string; firstName: string; email: string; enrolledAt: string }
+  participant: {
+    id: string
+    name: string
+    firstName: string
+    email: string
+    enrolledAt: string
+  }
   cohort: { id: string; name: string }
   courses: string[]
   trainers: string[]
   attendance: { present: number; recorded: number }
-  sessions: { id: string; startsAt: string; course: string; mark: 'present' | 'absent' | 'excused' | null }[]
-  assignments: { id: string; title: string; course: string; dueAt: string; submittedAt: string | null; status: ParticipantStatus; grade: string | null }[]
+  sessions: {
+    id: string
+    startsAt: string
+    course: string
+    mark: 'present' | 'absent' | 'excused' | null
+  }[]
+  assignments: {
+    id: string
+    title: string
+    course: string
+    dueAt: string
+    submittedAt: string | null
+    status: ParticipantStatus
+    grade: string | null
+  }[]
 }
 
-const markTone = { present: 'success', absent: 'warning', excused: 'info' } as const
-const markLabel = { present: 'Present', absent: 'Absent', excused: 'Excused' } as const
+const markTone = {
+  present: 'success',
+  absent: 'warning',
+  excused: 'info',
+} as const
+const markLabel = {
+  present: 'Present',
+  absent: 'Absent',
+  excused: 'Excused',
+} as const
 
 /** /trainer/participants/:id — T7.02 Participant (own course only), T7.03 record intervention. */
 export function TrainerParticipantPage() {
@@ -271,7 +354,10 @@ export function TrainerParticipantPage() {
                 { label: 'Email', value: d.participant.email },
                 { label: 'Cohort', value: d.cohort.name },
                 { label: 'Trainers', value: d.trainers.join(', ') },
-                { label: 'Enrolled', value: formatDayWithYear(d.participant.enrolledAt, tz) },
+                {
+                  label: 'Enrolled',
+                  value: formatDayWithYear(d.participant.enrolledAt, tz),
+                },
               ]}
             />
           </Panel>

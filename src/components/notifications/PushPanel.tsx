@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Badge, Panel, PanelHeader } from '@/components/ui/Page'
-import { pushState, turnOffPush, turnOnPush, type PushState } from '@/lib/push'
+import { pushState, sendTestPush, turnOffPush, turnOnPush, type PushState } from '@/lib/push'
 
 const copy: Record<PushState, string> = {
   on: 'This device shows a notification for everything ticked under In-app, even when Synqop is closed.',
@@ -18,6 +18,7 @@ export function PushPanel() {
   const [state, setState] = useState<PushState | null>(null)
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
+  const [test, setTest] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
 
   useEffect(() => {
     let live = true
@@ -33,13 +34,51 @@ export function PushPanel() {
   async function run(action: () => Promise<PushState>) {
     setBusy(true)
     setProblem(null)
+    setTest(null)
     try {
-      setState(await action())
+      const next = await action()
+      setState(next)
+      // Prove it straight away rather than waiting for real news.
+      if (next === 'on' && action === turnOnPush) await sendTest()
     } catch {
       setProblem('Couldn’t change push notifications on this device. Try again.')
     } finally {
       setBusy(false)
     }
+  }
+
+  async function sendTest() {
+    setTest(null)
+    try {
+      const result = await sendTestPush()
+      if (result === 'sent')
+        setTest({
+          tone: 'ok',
+          text: 'Test sent. It should appear on this device within a few seconds.',
+        })
+      else if (result === 'gone') {
+        setState('off')
+        setTest({
+          tone: 'bad',
+          text: 'This device stopped accepting notifications. Turn push on again.',
+        })
+      } else
+        setTest({
+          tone: 'bad',
+          text: 'The test couldn’t be delivered. Try again in a minute.',
+        })
+    } catch {
+      setTest({
+        tone: 'bad',
+        text: 'Couldn’t send a test. Check your connection and try again.',
+      })
+    }
+  }
+
+  async function runTest() {
+    setBusy(true)
+    await sendTest()
+    setBusy(false)
   }
 
   if (!state) return null
@@ -55,16 +94,26 @@ export function PushPanel() {
           {problem}
         </p>
       )}
+      {test && (
+        <p role="status" className={test.tone === 'ok' ? 'text-caption text-success-fg' : 'text-caption text-error-fg'}>
+          {test.text}
+        </p>
+      )}
       {(state === 'on' || state === 'off') && (
-        <div>
+        <div className="flex flex-wrap gap-2">
           {state === 'off' ? (
             <Button onClick={() => void run(turnOnPush)} disabled={busy}>
               {busy ? 'Turning on…' : 'Turn on push notifications'}
             </Button>
           ) : (
-            <Button variant="secondary" onClick={() => void run(turnOffPush)} disabled={busy}>
-              {busy ? 'Turning off…' : 'Turn off on this device'}
-            </Button>
+            <>
+              <Button variant="secondary" onClick={() => void runTest()} disabled={busy}>
+                Send a test notification
+              </Button>
+              <Button variant="secondary" onClick={() => void run(turnOffPush)} disabled={busy}>
+                Turn off on this device
+              </Button>
+            </>
           )}
         </div>
       )}

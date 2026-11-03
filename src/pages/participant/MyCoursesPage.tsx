@@ -1,4 +1,7 @@
+import { CalendarClock, ClipboardCheck, UserRound } from 'lucide-react'
 import { Link, useParams } from 'react-router'
+import { CardGrid, ItemCard, LayoutSwitch } from '@/components/collection/Collection'
+import { GRID_PANEL, useLayout } from '@/components/collection/layout'
 import { StatePanel } from '@/components/StatePanel'
 import { Avatar } from '@/components/ui/Avatar'
 import { BookOpenIcon, ChevronRightIcon } from '@/components/ui/icons'
@@ -29,9 +32,21 @@ export function MyCoursesPage() {
   const courses = query.data?.courses ?? []
   const timeZone = query.data?.timeZone
   const first = courses[0]
+  const [layout, setLayout] = useLayout('my-courses')
   return (
     <>
-      <PageHeader title="My courses" description={first ? `${first.cohort.name} · ${first.programme}` : undefined} />
+      <PageHeader
+        title="My courses"
+        description={first ? `${first.cohort.name} · ${first.programme}` : undefined}
+        actions={
+          courses.length > 0 ? (
+            // Phones stretch header actions; keep the switch its own size, on the right.
+            <div className="flex items-center justify-end">
+              <LayoutSwitch value={layout} onChange={setLayout} />
+            </div>
+          ) : undefined
+        }
+      />
       {query.isPending ? (
         <Panel aria-busy="true" aria-label="Loading courses" className="h-[200px]">
           <span className="sr-only">Loading courses</span>
@@ -52,6 +67,48 @@ export function MyCoursesPage() {
             title="No courses yet"
             body="When you’re in a cohort, its courses appear here with your attendance and work."
           />
+        </Panel>
+      ) : layout === 'grid' ? (
+        <Panel className={GRID_PANEL}>
+          <CardGrid label="My courses">
+            {courses.map((c) => (
+              <ItemCard
+                key={c.id}
+                to={c.id}
+                title={c.name}
+                description={[c.where === 'online' ? 'Online' : c.where, c.cohort.name].filter(Boolean).join(' · ')}
+                progress={{
+                  label: 'Sessions attended',
+                  value: c.attendance.recorded ? Math.round((c.attendance.present / c.attendance.recorded) * 100) : null,
+                  text: c.attendance.recorded ? `${c.attendance.present} of ${c.attendance.recorded}` : 'None yet',
+                }}
+                meta={[
+                  ...(c.trainer
+                    ? [
+                        {
+                          icon: <UserRound />,
+                          text: c.trainer,
+                          label: 'Trainer',
+                        },
+                      ]
+                    : []),
+                  ...(c.work
+                    ? [
+                        {
+                          icon: <ClipboardCheck />,
+                          text: `${c.work.submitted} of ${c.work.published} handed in`,
+                        },
+                      ]
+                    : []),
+                  {
+                    icon: <CalendarClock />,
+                    text: nextLabel(c.nextSession, timeZone) ?? 'No session scheduled',
+                    label: 'Next session',
+                  },
+                ]}
+              />
+            ))}
+          </CardGrid>
         </Panel>
       ) : (
         <Panel className="gap-0 max-md:py-2">

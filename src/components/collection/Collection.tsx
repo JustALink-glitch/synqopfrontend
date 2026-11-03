@@ -17,8 +17,16 @@ import { accentFor } from './accent'
 
 export function LayoutSwitch({ value, onChange }: { value: Layout; onChange: (l: Layout) => void }) {
   const options = [
-    { value: 'list' as const, label: 'List view', icon: <List aria-hidden className="size-4" /> },
-    { value: 'grid' as const, label: 'Grid view', icon: <LayoutGrid aria-hidden className="size-4" /> },
+    {
+      value: 'list' as const,
+      label: 'List view',
+      icon: <List aria-hidden className="size-4" />,
+    },
+    {
+      value: 'grid' as const,
+      label: 'Grid view',
+      icon: <LayoutGrid aria-hidden className="size-4" />,
+    },
   ]
   return (
     <div role="group" aria-label="Layout" className="inline-flex h-9 shrink-0 self-end rounded-md border border-default bg-surface p-0.5 md:self-auto">
@@ -47,7 +55,12 @@ export interface BulkAction {
   icon?: ReactNode
   destructive?: boolean
   /** Ask first: title and what will happen. */
-  confirm?: { title: string; body: ReactNode; button: string; /** Must be typed to continue (permanent deletes). */ typed?: string }
+  confirm?: {
+    title: string
+    body: ReactNode
+    button: string
+    /** Must be typed to continue (permanent deletes). */ typed?: string
+  }
   run: () => Promise<BulkOutcome | void>
 }
 
@@ -228,8 +241,8 @@ export function ItemCard({
   return (
     <li
       className={clsx(
-        'group relative flex flex-col gap-3 rounded-xl border bg-surface p-5 shadow-[var(--shadow-raised)] transition-[border-color,box-shadow]',
-        select?.checked ? 'border-brand ring-1 ring-[var(--color-brand)]' : 'border-default hover:border-strong hover:shadow-[var(--shadow-overlay)]',
+        'group relative flex flex-col gap-3 rounded-xl border bg-surface p-5 shadow-[var(--shadow-raised)] transition-colors',
+        select?.checked ? 'border-brand ring-1 ring-[var(--color-brand)]' : 'border-default hover:border-strong',
       )}
     >
       <div className="flex items-center gap-2.5">

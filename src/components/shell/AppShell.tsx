@@ -162,7 +162,10 @@ function AnnouncementCount({ collapsed }: { collapsed: boolean }) {
   if (!data?.unread) return null
   return (
     <>
-      <span className={clsx('ml-auto rounded-full bg-brand px-2 text-caption-strong text-on-brand tabular-nums', collapsed && 'max-xl:hidden')} aria-label={`${data.unread} new`}>
+      <span
+        className={clsx('ml-auto rounded-full bg-brand px-2 text-caption-strong text-on-brand tabular-nums', collapsed && 'max-xl:hidden')}
+        aria-label={`${data.unread} new`}
+      >
         {data.unread}
       </span>
       {collapsed && <span aria-hidden="true" className="absolute top-2 right-2 size-2 rounded-full bg-brand xl:hidden" />}
@@ -183,7 +186,7 @@ function TopBar({ me, area }: { me: Me; area: Area }) {
 }
 
 /** Account menu (G1.03). */
-function AccountMenu({ me, area }: { me: Me; area: Area }) {
+function AccountMenu({ me, area, compact = false }: { me: Me; area: Area; compact?: boolean }) {
   const { signOut } = useAuth()
   const [open, setOpen] = useState(false)
   const wrapper = useRef<HTMLDivElement>(null)
@@ -212,21 +215,30 @@ function AccountMenu({ me, area }: { me: Me; area: Area }) {
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={compact ? `Account: ${name}` : undefined}
         onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-3 rounded-md py-0.5 pr-1 pl-0.5 hover:bg-surface-hover focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none"
+        className={
+          compact
+            ? 'inline-flex size-11 items-center justify-center rounded-md hover:bg-surface-hover focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none'
+            : 'flex items-center gap-3 rounded-md py-0.5 pr-1 pl-0.5 hover:bg-surface-hover focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none'
+        }
       >
         <Avatar size={32} src={me.membership.photoUrl} initials={initials(me.membership.firstName, me.membership.lastName)} />
-        <span className="flex flex-col items-start text-left">
-          <span className="text-body-strong text-primary">{name}</span>
-          <span className="text-caption text-secondary">{role}</span>
-        </span>
-        <ChevronDownIcon size={16} className="text-icon" />
+        {!compact && (
+          <>
+            <span className="flex flex-col items-start text-left">
+              <span className="text-body-strong text-primary">{name}</span>
+              <span className="text-caption text-secondary">{role}</span>
+            </span>
+            <ChevronDownIcon size={16} className="text-icon" />
+          </>
+        )}
       </button>
       {open && (
         <div
           role="menu"
           aria-label="Account"
-          className="absolute top-[calc(100%+8px)] right-0 z-30 w-[260px] rounded-lg border border-default bg-surface py-2 shadow-[var(--shadow-overlay)]"
+          className="absolute top-[calc(100%+8px)] right-0 z-30 w-[260px] max-w-[calc(100vw-16px)] rounded-lg border border-default bg-surface py-2 shadow-[var(--shadow-overlay)]"
         >
           <div className="flex flex-col gap-0.5 border-b border-default px-4 py-3">
             <span className="text-body-strong text-primary">{name}</span>
@@ -267,7 +279,9 @@ function MenuLink({ to, icon, onSelect, children }: { to: string; icon: ReactNod
 /** Phones: a dot on the menu button while there are new announcements. */
 function MenuDot() {
   const { data } = useUnreadAnnouncements()
-  return data?.unread ? <span aria-hidden="true" className="absolute top-2.5 right-2.5 size-2 rounded-full bg-brand ring-2 ring-[var(--color-surface)]" /> : null
+  return data?.unread ? (
+    <span aria-hidden="true" className="absolute top-2.5 right-2.5 size-2 rounded-full bg-brand ring-2 ring-[var(--color-surface)]" />
+  ) : null
 }
 
 function MobileTopBar({ me, area, onMenu }: { me: Me; area: Area; onMenu: () => void }) {
@@ -290,7 +304,7 @@ function MobileTopBar({ me, area, onMenu }: { me: Me; area: Area; onMenu: () => 
         <SearchIcon size={22} />
       </Link>
       <NotificationsBell area={area} size={44} />
-      <Avatar size={32} src={me.membership.photoUrl} initials={initials(me.membership.firstName, me.membership.lastName)} />
+      <AccountMenu me={me} area={area} compact />
     </header>
   )
 }

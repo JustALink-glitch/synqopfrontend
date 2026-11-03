@@ -1,4 +1,7 @@
+import { Award, CalendarCheck, Ruler } from 'lucide-react'
 import { Link, useParams } from 'react-router'
+import { CardGrid, ItemCard, LayoutSwitch } from '@/components/collection/Collection'
+import { GRID_PANEL, useLayout } from '@/components/collection/layout'
 import { StatePanel } from '@/components/StatePanel'
 import { CheckCircleIcon, ChevronRightIcon } from '@/components/ui/icons'
 import { Badge, EmptyState, PageHeader, Panel, PanelHeader } from '@/components/ui/Page'
@@ -24,10 +27,16 @@ export function GradesPage() {
   const query = useMyGrades()
   const grades = query.data?.grades ?? []
   const timeZone = query.data?.timeZone
+  const [layout, setLayout] = useLayout('my-grades')
 
   return (
     <>
       <GradesHeader />
+      {grades.length > 0 && (
+        <div className="flex justify-end">
+          <LayoutSwitch value={layout} onChange={setLayout} />
+        </div>
+      )}
       {query.isPending ? (
         <Panel aria-busy="true" aria-label="Loading grades" className="h-[240px]">
           <span className="sr-only">Loading grades</span>
@@ -56,6 +65,38 @@ export function GradesPage() {
               </Link>
             }
           />
+        </Panel>
+      ) : layout === 'grid' ? (
+        <Panel className={GRID_PANEL}>
+          <CardGrid label="Grades">
+            {grades.map((g) => (
+              <ItemCard
+                key={g.id}
+                to={g.grade ? g.id : `/participant/assignments/${g.id}`}
+                title={g.title}
+                description={g.course.name}
+                accent={g.grade ? 'var(--chart-6)' : 'var(--chart-1)'}
+                badge={g.grade ? <Badge tone="success">Graded</Badge> : <Badge tone="info">Waiting for a grade</Badge>}
+                meta={[
+                  { icon: <Award />, text: g.grade ?? '—', label: 'Grade' },
+                  {
+                    icon: <Ruler />,
+                    text: scaleName[g.gradingScale],
+                    label: 'Scale',
+                  },
+                  ...(g.gradedAt
+                    ? [
+                        {
+                          icon: <CalendarCheck />,
+                          text: formatDay(g.gradedAt, timeZone),
+                          label: 'Graded',
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            ))}
+          </CardGrid>
         </Panel>
       ) : (
         <Panel className="gap-0 max-md:py-2">
@@ -203,7 +244,8 @@ export function FeedbackPage() {
               {outOf && <span className="text-body text-secondary">/ {outOf}</span>}
             </p>
             <p className="text-caption text-secondary">
-              {scaleName[a.gradingScale]} · graded{g.gradedBy ? ` by ${g.gradedBy}` : ''} on {formatDay(g.gradedAt, timeZone)}
+              {scaleName[a.gradingScale]} · graded
+              {g.gradedBy ? ` by ${g.gradedBy}` : ''} on {formatDay(g.gradedAt, timeZone)}
             </p>
           </Panel>
         </aside>
