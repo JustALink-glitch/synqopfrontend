@@ -13,6 +13,7 @@ import { ChevronDownIcon, CloseIcon, MenuIcon, SearchIcon, SettingsIcon, SignOut
 import { initials, roleLabel, shortName } from '@/lib/people'
 import { NotificationsBell } from '@/pages/shell/Notifications'
 import { GlobalSearch } from '@/pages/shell/Search'
+import { useUnreadAnnouncements } from '@/pages/announcements/data'
 import type { Area } from '@/lib/roles'
 
 const WORKSPACE_LABEL: Record<Area, string> = {
@@ -126,7 +127,7 @@ function SidebarLink({ area, item, inDrawer }: { area: Area; item: NavItem; inDr
       title={inDrawer ? undefined : item.label}
       className={({ isActive }) =>
         clsx(
-          'flex items-center gap-3 rounded-md px-3 text-label-nav tracking-[-0.1px] transition-colors',
+          'relative flex items-center gap-3 rounded-md px-3 text-label-nav tracking-[-0.1px] transition-colors',
           'focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none',
           inDrawer ? 'h-11' : 'h-10 max-xl:justify-center max-xl:px-0',
           isActive ? 'bg-surface-selected text-brand-text' : 'text-secondary hover:bg-surface-hover hover:text-primary',
@@ -136,6 +137,7 @@ function SidebarLink({ area, item, inDrawer }: { area: Area; item: NavItem; inDr
       <Icon size={20} className="shrink-0" />
       <span className={clsx('truncate', !inDrawer && 'max-xl:sr-only')}>{item.label}</span>
       {area === 'admin' && item.path === 'needs-attention' && <AttentionCount hidden={!inDrawer} />}
+      {item.path === 'announcements' && <AnnouncementCount collapsed={!inDrawer} />}
     </NavLink>
   )
 }
@@ -151,6 +153,20 @@ function AttentionCount({ hidden }: { hidden: boolean }) {
     >
       {data.count}
     </span>
+  )
+}
+
+/** New announcements, until they're marked read (G1.03). A dot when the sidebar is narrow. */
+function AnnouncementCount({ collapsed }: { collapsed: boolean }) {
+  const { data } = useUnreadAnnouncements()
+  if (!data?.unread) return null
+  return (
+    <>
+      <span className={clsx('ml-auto rounded-full bg-brand px-2 text-caption-strong text-on-brand tabular-nums', collapsed && 'max-xl:hidden')} aria-label={`${data.unread} new`}>
+        {data.unread}
+      </span>
+      {collapsed && <span aria-hidden="true" className="absolute top-2 right-2 size-2 rounded-full bg-brand xl:hidden" />}
+    </>
   )
 }
 
@@ -248,6 +264,12 @@ function MenuLink({ to, icon, onSelect, children }: { to: string; icon: ReactNod
   )
 }
 
+/** Phones: a dot on the menu button while there are new announcements. */
+function MenuDot() {
+  const { data } = useUnreadAnnouncements()
+  return data?.unread ? <span aria-hidden="true" className="absolute top-2.5 right-2.5 size-2 rounded-full bg-brand ring-2 ring-[var(--color-surface)]" /> : null
+}
+
 function MobileTopBar({ me, area, onMenu }: { me: Me; area: Area; onMenu: () => void }) {
   return (
     <header className="sticky top-0 z-20 flex h-topbar items-center gap-1 border-b border-default bg-surface pr-2 pl-1 md:hidden">
@@ -255,9 +277,10 @@ function MobileTopBar({ me, area, onMenu }: { me: Me; area: Area; onMenu: () => 
         type="button"
         aria-label="Open navigation"
         onClick={onMenu}
-        className="inline-flex size-11 items-center justify-center rounded-md text-icon hover:bg-surface-hover"
+        className="relative inline-flex size-11 items-center justify-center rounded-md text-icon hover:bg-surface-hover"
       >
         <MenuIcon size={22} />
+        <MenuDot />
       </button>
       <Link to={`/${area}`} aria-label="Synqop home">
         <img src={logo} alt="Synqop" width={100} height={30} />

@@ -62,6 +62,12 @@
   --chart-absent: #e19238;
   --chart-track: #e7ecf1;
   --chart-grid: #e7ecf1;
+  --chart-1: #2563eb;
+  --chart-2: #14a3a3;
+  --chart-3: #e19238;
+  --chart-4: #8b5cf6;
+  --chart-5: #e0484b;
+  --chart-6: #22a05b;
   --overlay-scrim: rgb(21 27 36 / 0.48);
 
   /* Layout: desktop values; tablet and mobile below. */
@@ -194,6 +200,12 @@
   --color-chart-absent: var(--chart-absent);
   --color-chart-track: var(--chart-track);
   --color-chart-grid: var(--chart-grid);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
   --color-scrim: var(--overlay-scrim);
 
   --radius-xs: 4px;

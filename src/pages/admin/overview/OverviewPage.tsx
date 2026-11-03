@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
@@ -23,6 +23,8 @@ import { Badge, EmptyState, FilterChips, PageHeader, Panel, PanelHeader } from '
 import { Cell, Row, Stacked, Table, type Column } from '@/components/ui/Table'
 import { api } from '@/lib/api'
 import { formatDate, formatDay, formatTime, localDate, plural, relativeDay } from '@/lib/format'
+import { BarChart } from '@/components/charts/Charts'
+import { TextField } from '@/components/ui/TextField'
 import { initials } from '@/lib/people'
 import { describeFlag, followUpLine, rulesSentence, signalOf, useAttention, type Signal } from '@/pages/admin/attention/data'
 import { useCohorts, type CohortSummary } from '@/pages/admin/programmes/data'
@@ -269,62 +271,116 @@ function AttentionPanel({ timeZone }: { timeZone: string }) {
   )
 }
 
-/** O1.01 Training activity: weekly check-ins as stacked bars; the label is present ÷ recorded. */
+type Period = 'week' | 'month' | 'year' | 'custom'
+interface Activity {
+  unit: 'day' | 'week' | 'month' | 'year'
+  from: string
+  to: string
+  buckets: { start: string; present: number; excused: number; absent: number; rate: number | null }[]
+}
+
+const periods: { value: Period; label: string }[] = [
+  { value: 'week', label: 'Weekly' },
+  { value: 'month', label: 'Monthly' },
+  { value: 'year', label: 'Yearly' },
+  { value: 'custom', label: 'Custom' },
+]
+
+const bucketLabel = (start: string, unit: Activity['unit']) => {
+  const d = new Date(`${start}T12:00:00Z`)
+  const f = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('en-GB', { ...o, timeZone: 'UTC' }).format(d)
+  return unit === 'year'
+    ? f({ year: 'numeric' })
+    : unit === 'month'
+      ? f({ month: 'short', year: '2-digit' })
+      : unit === 'week'
+        ? f({ day: 'numeric', month: 'short' })
+        : f({ day: 'numeric', month: 'short' })
+}
+
+const periodNote: Record<Period, string> = {
+  week: 'Check-ins per week, last 8 weeks.',
+  month: 'Check-ins per month, last 12 months.',
+  year: 'Check-ins per year, last 5 years.',
+  custom: 'Check-ins for the dates you choose.',
+}
+
+/** O1.01 Training activity: check-ins as stacked bars by week, month, year or chosen dates; the label is present ÷ recorded. */
 function ActivityPanel({ data: d }: { data: Overview }) {
-  const weeks = d.activity
-  const max = Math.max(1, ...weeks.map((w) => w.present + w.excused + w.absent))
-  const any = weeks.some((w) => w.present + w.excused + w.absent > 0)
+  const today = todayIn(d.timeZone)
+  const [period, setPeriod] = useState<Period>('week')
+  const [from, setFrom] = useState(() => addDays(today, -29))
+  const [to, setTo] = useState(today)
+  const valid = period !== 'custom' || (Boolean(from) && Boolean(to) && from <= to)
+  const query = useQuery({
+    queryKey: ['overview', 'activity', period, period === 'custom' ? from : '', period === 'custom' ? to : ''],
+    queryFn: ({ signal }) => api<Activity>(`/v1/overview/activity?period=${period}${period === 'custom' ? `&from=${from}&to=${to}` : ''}`, { signal }),
+    enabled: valid,
+    placeholderData: keepPreviousData,
+  })
+  const a = query.data
+  const buckets = a?.buckets ?? []
+  const any = buckets.some((w) => w.present + w.excused + w.absent > 0)
   return (
-    <Panel className="gap-0">
-      <PanelHeader title="Training activity" description="Weekly check-ins, all cohorts, last 8 weeks." />
-      {!any ? (
-        <div className="mt-3 rounded-md bg-canvas p-6 text-center">
-          <p className="text-body-strong text-primary">No activity yet</p>
-          <p className="text-caption text-secondary">Weekly attendance appears after the first register is saved.</p>
+    <Panel className="gap-3">
+      <div className="flex flex-col gap-3">
+        <PanelHeader title="Training activity" description={`${periodNote[period]} All cohorts.`} />
+        <div role="group" aria-label="Period" className="grid h-8 grid-cols-4 rounded-md border border-default bg-surface p-0.5">
+          {periods.map((p) => (
+            <button
+              key={p.value}
+              type="button"
+              aria-pressed={period === p.value}
+              onClick={() => setPeriod(p.value)}
+              className={clsx(
+                'rounded-[5px] px-2.5 text-caption-strong transition-colors focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none',
+                period === p.value ? 'bg-brand-subtle text-brand-text' : 'text-secondary hover:text-primary',
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {period === 'custom' && (
+        <div className="grid grid-cols-2 gap-3">
+          <TextField label="From" type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
+          <TextField
+            label="To"
+            type="date"
+            value={to}
+            min={from}
+            onChange={(e) => setTo(e.target.value)}
+            error={!valid ? 'Choose a date on or after the start.' : undefined}
+          />
+        </div>
+      )}
+      {query.isError ? (
+        <p className="py-6 text-center text-body text-secondary">Couldn’t load activity. Try again.</p>
+      ) : !a ? (
+        <div className="h-[178px]" aria-busy="true" />
+      ) : !any ? (
+        <div className="rounded-md bg-canvas p-6 text-center">
+          <p className="text-body-strong text-primary">No activity in this period</p>
+          <p className="text-caption text-secondary">Attendance appears here after registers are saved.</p>
         </div>
       ) : (
         <>
-          <ul className="mt-2 flex gap-3 text-caption text-secondary" aria-label="Legend">
-            {(
-              [
-                ['bg-chart-present', 'Present'],
-                ['bg-chart-excused', 'Excused'],
-                ['bg-chart-absent', 'Absent'],
-              ] as const
-            ).map(([c, l]) => (
-              <li key={l} className="inline-flex items-center gap-1.5">
-                <span className={clsx('size-2 rounded-xs', c)} aria-hidden="true" />
-                {l}
-              </li>
-            ))}
-          </ul>
-          <ol className="mt-3 grid h-[160px] grid-cols-8 items-end gap-2 border-b border-default" aria-label="Check-ins per week">
-            {weeks.map((w) => {
-              const total = w.present + w.excused + w.absent
-              return (
-                <li
-                  key={w.weekOf}
-                  className="flex h-full flex-col items-center justify-end gap-1"
-                  aria-label={`Week of ${formatDate(w.weekOf)}: ${w.present} present, ${w.excused} excused, ${w.absent} absent${w.rate !== null ? `, ${w.rate}%` : ''}`}
-                >
-                  {w.rate !== null && <span className="text-chart-label text-secondary tabular-nums">{w.rate}%</span>}
-                  <span className="flex w-full max-w-4 flex-col-reverse overflow-hidden rounded-t-xs" style={{ height: `${(total / max) * 120}px` }}>
-                    <span className="bg-chart-present" style={{ height: `${total ? (w.present / total) * 100 : 0}%` }} />
-                    <span className="bg-chart-excused" style={{ height: `${total ? (w.excused / total) * 100 : 0}%` }} />
-                    <span className="bg-chart-absent" style={{ height: `${total ? (w.absent / total) * 100 : 0}%` }} />
-                  </span>
-                </li>
-              )
-            })}
-          </ol>
-          <div className="grid grid-cols-8 gap-2 pt-1 text-chart-label text-secondary">
-            {weeks.map((w, i) => (
-              <span key={w.weekOf} className="text-center whitespace-nowrap">
-                {i % 2 === 0 ? formatDate(w.weekOf).replace(/^\w+ /, '') : ''}
-              </span>
-            ))}
-          </div>
-          <p className="pt-3 text-caption text-secondary">% = present ÷ recorded check-ins. Excused counts as not present.</p>
+          <BarChart
+            stacked
+            labels={buckets.map((b) => bucketLabel(b.start, a.unit))}
+            series={[
+              { name: 'Present', values: buckets.map((b) => b.present), colour: 'var(--chart-present)' },
+              { name: 'Excused', values: buckets.map((b) => b.excused), colour: 'var(--chart-excused)' },
+              { name: 'Absent', values: buckets.map((b) => b.absent), colour: 'var(--chart-absent)' },
+            ]}
+            top={(i) => (buckets.length <= 14 && buckets[i]!.rate !== null ? `${buckets[i]!.rate}%` : null)}
+            describe={(i) => {
+              const b = buckets[i]!
+              return `${bucketLabel(b.start, a.unit)}: ${b.present} present, ${b.excused} excused, ${b.absent} absent${b.rate !== null ? `, ${b.rate}%` : ''}`
+            }}
+          />
+          <p className="text-caption text-secondary">% = present ÷ recorded check-ins. Excused counts as not present.</p>
         </>
       )}
     </Panel>

@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { MoreHorizontal } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ChevronDownIcon, ChevronRightIcon } from './icons'
 
@@ -14,7 +15,7 @@ export function Menu({
   items: { label: string; onSelect: () => void; destructive?: boolean; icon?: ReactNode }[]
   align?: 'left' | 'right'
   /** "link": a small text trigger for table rows ("Edit ›", F1.02). */
-  variant?: 'button' | 'link'
+  variant?: 'button' | 'link' | 'icon'
   /** Spoken name when the visible label isn't enough ("Edit Femi Johnson"). */
   accessibleLabel?: string
 }) {
@@ -38,8 +39,20 @@ export function Menu({
   }, [open])
 
   return (
-    <div ref={wrapper} className="relative">
-      {variant === 'link' ? (
+    <div ref={wrapper} className="relative" onClick={(e) => e.stopPropagation()}>
+      {variant === 'icon' ? (
+        <button
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label={accessibleLabel ?? label}
+          title={label}
+          onClick={() => setOpen((value) => !value)}
+          className="inline-flex size-8 items-center justify-center rounded-md text-icon hover:bg-surface-hover focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none"
+        >
+          <MoreHorizontal aria-hidden className="size-[18px]" />
+        </button>
+      ) : variant === 'link' ? (
         <button
           type="button"
           aria-haspopup="menu"
@@ -69,7 +82,8 @@ export function Menu({
           role="menu"
           aria-label={accessibleLabel ?? label}
           className={clsx(
-            'absolute top-[calc(100%+6px)] z-30 min-w-[200px] rounded-lg border border-default bg-surface py-1.5 shadow-[var(--shadow-overlay)] max-md:left-0 max-md:w-full',
+            'absolute top-[calc(100%+6px)] z-30 min-w-[200px] rounded-lg border border-default bg-surface py-1.5 shadow-[var(--shadow-overlay)]',
+            variant !== 'icon' && 'max-md:left-0 max-md:w-full',
             align === 'right' ? 'right-0' : 'left-0',
           )}
         >

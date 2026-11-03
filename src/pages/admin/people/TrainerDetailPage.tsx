@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { StatePanel } from '@/components/StatePanel'
 import { AlertBanner } from '@/components/ui/AlertBanner'
@@ -74,7 +74,9 @@ function TrainerDetail({
   const revoke = useRevokeInvitation(member.id)
   const [confirmRevoke, setConfirmRevoke] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
-  const [dialog, setDialog] = useState<'assign' | 'edit' | 'deactivate' | null>(null)
+  // Opened from a ⋯ menu on the Trainers list ("Deactivate", "Edit", "Assign").
+  const opened = (useLocation().state as { open?: 'assign' | 'edit' | 'deactivate' } | null)?.open ?? null
+  const [dialog, setDialog] = useState<'assign' | 'edit' | 'deactivate' | null>(opened)
   const reactivate = useReactivateMember(member.id)
   const unassign = useUnassignTrainer(member.id)
   const deactivated = member.status === 'deactivated'

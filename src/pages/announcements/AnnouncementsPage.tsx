@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Megaphone } from 'lucide-react'
+import { Check, CheckCheck, Megaphone } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useLocation } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
@@ -21,6 +21,7 @@ import {
   useAnnouncements,
   useDeleteAnnouncement,
   useEditAnnouncement,
+  useMarkRead,
   usePostAnnouncement,
   type Announcement,
   type Audience,
@@ -63,6 +64,7 @@ export function AnnouncementsPage({ area }: { area: Area }) {
   const [editing, setEditing] = useState<Announcement | null>(null)
   const [deleting, setDeleting] = useState<Announcement | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const mark = useMarkRead()
 
   // Opened from a notification: bring that announcement into view.
   useEffect(() => {
@@ -77,11 +79,18 @@ export function AnnouncementsPage({ area }: { area: Area }) {
         title="Announcements"
         description={intro[area]}
         actions={
-          view?.canPost && (
-            <Button icon={<Megaphone aria-hidden className="size-4" />} onClick={() => setComposing(true)}>
-              New announcement
-            </Button>
-          )
+          <>
+            {Boolean(view?.unread) && (
+              <Button variant="secondary" icon={<CheckCheck aria-hidden className="size-4" />} disabled={mark.isPending} onClick={() => mark.mutate({ id: 'all', read: true })}>
+                Mark all as read
+              </Button>
+            )}
+            {view?.canPost && (
+              <Button icon={<Megaphone aria-hidden className="size-4" />} onClick={() => setComposing(true)}>
+                New announcement
+              </Button>
+            )}
+          </>
         }
       />
       {notice && <AlertBanner tone="success" title={notice} />}
@@ -113,7 +122,10 @@ export function AnnouncementsPage({ area }: { area: Area }) {
         <ul className="flex flex-col gap-3">
           {view!.announcements.map((a) => (
             <li key={a.id} id={`a-${a.id}`}>
-              <Panel className={clsx('gap-3 scroll-mt-24', hash === `#${a.id}` && 'ring-2 ring-[var(--color-brand)]')}>
+              <Panel
+                aria-label={a.read ? a.title : `New: ${a.title}`}
+                className={clsx('gap-3 scroll-mt-24', !a.read && 'border-l-4 border-l-[var(--color-brand)]', hash === `#${a.id}` && 'ring-2 ring-[var(--color-brand)]')}
+              >
                 <div className="flex items-start gap-3">
                   <Avatar size={40} seed={a.author?.id} initials={initials(...(a.author?.name.split(' ') ?? ['?']))} />
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -128,24 +140,35 @@ export function AnnouncementsPage({ area }: { area: Area }) {
                         .join(' · ')}
                     </span>
                   </div>
-                  {a.can.edit && (
-                    <Menu
-                      label="Edit"
-                      variant="link"
-                      accessibleLabel={`Edit ${a.title}`}
-                      items={[
-                        { label: 'Edit', onSelect: () => setEditing(a) },
-                        { label: 'Delete', destructive: true, onSelect: () => setDeleting(a) },
-                      ]}
-                    />
-                  )}
+                  <Menu
+                    label="More"
+                    variant="link"
+                    accessibleLabel={`More for ${a.title}`}
+                    items={[
+                      a.read ? { label: 'Mark as unread', onSelect: () => mark.mutate({ id: a.id, read: false }) } : { label: 'Mark as read', onSelect: () => mark.mutate({ id: a.id, read: true }) },
+                      ...(a.can.edit
+                        ? [
+                            { label: 'Edit', onSelect: () => setEditing(a) },
+                            { label: 'Delete', destructive: true, onSelect: () => setDeleting(a) },
+                          ]
+                        : []),
+                    ]}
+                  />
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  {!a.read && <Badge tone="info">New</Badge>}
                   <Badge tone="neutral">{audienceLabel(a)}</Badge>
                   {a.important && <Badge tone="warning">Important</Badge>}
                 </div>
                 <h2 className="text-heading-section text-primary">{a.title}</h2>
                 <p className="text-body whitespace-pre-line text-primary">{a.body}</p>
+                {!a.read && (
+                  <div>
+                    <Button variant="secondary" icon={<Check aria-hidden className="size-4" />} disabled={mark.isPending} onClick={() => mark.mutate({ id: a.id, read: true })}>
+                      Mark as read
+                    </Button>
+                  </div>
+                )}
               </Panel>
             </li>
           ))}

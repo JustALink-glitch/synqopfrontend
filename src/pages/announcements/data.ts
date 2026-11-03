@@ -13,10 +13,12 @@ export interface Announcement {
   author: { id: string; name: string; role: string } | null
   createdAt: string
   edited: boolean
+  read: boolean
   can: { edit: boolean }
 }
 
 export interface AnnouncementsView {
+  unread: number
   announcements: Announcement[]
   canPost: boolean
   audiences: Audience[]
@@ -58,6 +60,30 @@ export function useDeleteAnnouncement() {
     mutationFn: (id: string) => api<null>(`/v1/announcements/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: key })
+      void client.invalidateQueries({ queryKey: ['notifications'] })
+    },
+  })
+}
+
+/** The menu badge: checks every minute and when the tab comes back into view. */
+export const useUnreadAnnouncements = () =>
+  useQuery({
+    queryKey: [...key, 'unread'],
+    queryFn: ({ signal }) => api<{ unread: number }>('/v1/announcements/unread', { signal }),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  })
+
+export function useMarkRead() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, read }: { id: string | 'all'; read: boolean }) =>
+      api<{ unread: number }>(id === 'all' ? '/v1/announcements/read-all' : `/v1/announcements/${id}/read`, { method: read ? 'POST' : 'DELETE' }),
+    onSuccess: (data, { id, read }) => {
+      client.setQueryData([...key, 'unread'], data)
+      client.setQueryData<AnnouncementsView>(key, (old) =>
+        old ? { ...old, unread: data.unread, announcements: old.announcements.map((a) => (id === 'all' || a.id === id ? { ...a, read } : a)) } : old,
+      )
       void client.invalidateQueries({ queryKey: ['notifications'] })
     },
   })

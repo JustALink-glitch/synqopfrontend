@@ -205,6 +205,15 @@ export const useRemoveCourseResource = (id: string) =>
 
 // ─── Mutations. Anything that changes the structure refreshes every list. ───
 
+/** For bulk actions: refresh every structure list once after many requests. */
+export function useRefreshStructure() {
+  const client = useQueryClient()
+  return () => Promise.all([keys.programmes, keys.cohorts, ['courses'], ['members'], ['overview']].map((queryKey) => client.invalidateQueries({ queryKey })))
+}
+
+/** Bulk "Delete permanently": the API refuses anything with records, and says why. */
+export const deleteForever = (kind: 'programmes' | 'cohorts' | 'courses', id: string) => api<null>(`/v1/${kind}/${id}`, { method: 'DELETE' })
+
 function useStructureMutation<TInput, TResult>(fn: (input: TInput) => Promise<TResult>) {
   const client = useQueryClient()
   return useMutation({

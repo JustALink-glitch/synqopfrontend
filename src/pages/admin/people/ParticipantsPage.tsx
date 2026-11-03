@@ -18,6 +18,12 @@ import { AddParticipantDialog } from '@/pages/admin/participants/AddParticipantD
 import { useParticipants, type ParticipantSummary } from '@/pages/admin/participants/data'
 import { AssignmentsSummary, ParticipantBadge } from '@/pages/admin/participants/ParticipantBadge'
 import { useCohorts } from '@/pages/admin/programmes/data'
+import { useQueryClient } from '@tanstack/react-query'
+import { Download, Mail } from 'lucide-react'
+import { BulkBar, CardGrid, ItemCard, LayoutSwitch, RowActions } from '@/components/collection/Collection'
+import { useLayout } from '@/components/collection/layout'
+import { downloadCsv, runBulk, useSelection } from '@/components/collection/selection'
+import { api, ApiError } from '@/lib/api'
 
 type Filter = 'all' | 'on_track' | 'attention' | 'invited' | 'deferred' | 'withdrawn' | 'other'
 
@@ -28,6 +34,7 @@ const columns: Column[] = [
   { label: 'Assignments', width: 130, hideBelow: 'xl' },
   { label: 'Status', width: 130 },
   { label: 'Last active', width: 130, hideBelow: 'lg' },
+  { label: '', width: 56, align: 'right' },
 ]
 
 /** Which status filter a participant falls under. */
@@ -66,6 +73,47 @@ export function ParticipantsPage() {
   const paged = paginate(visible, page)
   const count = (f: Filter) => inCohort.filter((p) => bucket(p) === f).length
   const noCohorts = !cohorts.isPending && openCohorts.length === 0
+  const [layout, setLayout] = useLayout('participants')
+  const selection = useSelection(paged.rows.map((p) => p.id))
+  const chosen = paged.rows.filter((p) => selection.has(p.id))
+  const client = useQueryClient()
+  const name = (p: ParticipantSummary) => `${p.firstName} ${p.lastName}`.trim()
+  const resend = async (p: ParticipantSummary) => {
+    if (p.status !== 'invited') throw new ApiError(409, 'already_joined', 'Already joined.')
+    return api(`/v1/members/${p.id}/invitation`, { method: 'POST' })
+  }
+  async function resendAll(items: ParticipantSummary[]) {
+    const o = await runBulk('Invitation resent', items, name, resend)
+    await client.invalidateQueries({ queryKey: ['participants'] })
+    return o
+  }
+  const rowActions = (p: ParticipantSummary) => (
+    <RowActions
+      label={name(p)}
+      items={[
+        { label: 'Open profile', onSelect: () => navigate(p.id) },
+        ...(p.enrolment ? [{ label: 'Open cohort', onSelect: () => navigate(`/admin/cohorts/${p.enrolment!.cohort.id}`) }] : []),
+        ...(p.status === 'invited'
+          ? [
+              {
+                label: 'Resend invitation',
+                onSelect: () =>
+                  void resendAll([p]).then((o) =>
+                    setNotice(
+                      o.done.length
+                        ? { tone: 'success', title: `Invitation sent to ${p.email}`, body: 'The new link works for 72 hours.' }
+                        : { tone: 'warning', title: 'Couldn’t resend', body: o.skipped[0]?.reason ?? '' },
+                    ),
+                  ),
+              },
+            ]
+          : []),
+      ]}
+    />
+  )
+  const badge = (p: ParticipantSummary) => (
+    <ParticipantBadge memberStatus={p.status} invitationExpiresAt={p.invitationExpiresAt} enrolmentStatus={p.enrolment?.status} flags={p.enrolment?.flags} />
+  )
 
   const actions = (
     <>
@@ -176,7 +224,60 @@ export function ParticipantsPage() {
                 setPage(1)
               }}
             />
+            <LayoutSwitch value={layout} onChange={setLayout} />
           </div>
+          <BulkBar
+            selection={selection}
+            noun={['participant', 'participants']}
+            actions={[
+              {
+                label: 'Export CSV',
+                icon: <Download aria-hidden className="size-4" />,
+                run: async () =>
+                  downloadCsv(
+                    'Participants.csv',
+                    [
+                      'First name',
+                      'Last name',
+                      'Email',
+                      'Phone',
+                      'Cohort',
+                      'Programme',
+                      'Enrolment',
+                      'Attendance',
+                      'Assignments submitted',
+                      'Assignments due',
+                      'Needs attention',
+                      'Last active',
+                    ],
+                    chosen.map((p) => [
+                      p.firstName,
+                      p.lastName,
+                      p.email,
+                      p.phone,
+                      p.enrolment?.cohort.name,
+                      p.enrolment?.programmeName,
+                      p.status === 'invited' ? 'invited' : p.enrolment?.status,
+                      p.enrolment?.attendance ? `${p.enrolment.attendance.rate}%` : '',
+                      p.enrolment?.assignments?.submitted,
+                      p.enrolment?.assignments?.due,
+                      p.enrolment?.flags ?? 0,
+                      p.lastSignInAt?.slice(0, 10),
+                    ]),
+                  ),
+              },
+              {
+                label: 'Resend invitation',
+                icon: <Mail aria-hidden className="size-4" />,
+                confirm: {
+                  title: 'Resend invitations?',
+                  body: `A new 72-hour link goes to each ticked person who hasn’t joined yet. ${plural(chosen.filter((p) => p.status !== 'invited').length, 'person has', 'people have')} already joined and will be skipped.`,
+                  button: 'Resend',
+                },
+                run: () => resendAll(chosen),
+              },
+            ]}
+          />
 
           <Panel className="gap-0 max-md:py-2">
             {visible.length === 0 ? (
@@ -197,12 +298,35 @@ export function ParticipantsPage() {
                   Clear search
                 </Button>
               </div>
+            ) : layout === 'grid' ? (
+              <div className="py-2">
+                <CardGrid label="Participants">
+                  {paged.rows.map((p) => (
+                    <ItemCard
+                      key={p.id}
+                      to={p.id}
+                      title={name(p)}
+                      subtitle={p.email}
+                      leading={<Avatar size={40} initials={initials(p.firstName, p.lastName)} seed={p.id} />}
+                      badge={badge(p)}
+                      select={{ checked: selection.has(p.id), onChange: () => selection.toggle(p.id) }}
+                      actions={rowActions(p)}
+                      facts={[
+                        { label: 'Cohort', value: p.enrolment?.cohort.name ?? 'No cohort' },
+                        { label: 'Attendance', value: <Percent value={p.enrolment?.attendance?.rate} /> },
+                        { label: 'Assignments', value: <AssignmentsSummary value={p.enrolment?.assignments} /> },
+                        { label: 'Last active', value: p.lastSignInAt ? relativeDay(p.lastSignInAt, timeZone) : 'Not signed in' },
+                      ]}
+                    />
+                  ))}
+                </CardGrid>
+              </div>
             ) : (
               <>
                 <div className="max-md:hidden">
-                  <Table columns={columns}>
+                  <Table columns={columns} select={{ checked: selection.header, onChange: selection.toggleAll, label: 'Select all participants on this page' }}>
                     {paged.rows.map((p) => (
-                      <Row key={p.id} to={p.id}>
+                      <Row key={p.id} to={p.id} select={{ checked: selection.has(p.id), onChange: () => selection.toggle(p.id), label: `Select ${name(p)}` }}>
                         <Cell>
                           <span className="flex min-w-0 items-center gap-3">
                             <Avatar initials={initials(p.firstName, p.lastName)} seed={p.id} />
@@ -243,6 +367,7 @@ export function ParticipantsPage() {
                         <Cell hideBelow="lg" className={p.lastSignInAt ? undefined : 'text-muted'}>
                           {p.lastSignInAt ? relativeDay(p.lastSignInAt, timeZone) : 'Not signed in'}
                         </Cell>
+                        <Cell align="right">{rowActions(p)}</Cell>
                       </Row>
                     ))}
                   </Table>

@@ -4,7 +4,12 @@ import { StatePanel } from '@/components/StatePanel'
 import { AlertBanner } from '@/components/ui/AlertBanner'
 import { Button } from '@/components/ui/Button'
 import { ChevronRightIcon, ClipboardIcon, PlusIcon } from '@/components/ui/icons'
-import { EmptyState, FilterChips, PageHeader, Panel } from '@/components/ui/Page'
+import { Badge, EmptyState, FilterChips, PageHeader, Panel } from '@/components/ui/Page'
+import { Download } from 'lucide-react'
+import { BulkBar, CardGrid, ItemCard, LayoutSwitch } from '@/components/collection/Collection'
+import { useLayout } from '@/components/collection/layout'
+import { useSelection } from '@/components/collection/selection'
+import { assignmentsCsv } from './csv'
 import { Cell, Row, Stacked, Table, TableFooter, type Column } from '@/components/ui/Table'
 import { formatDay, plural } from '@/lib/format'
 import { paginate } from '@/lib/paginate'
@@ -53,6 +58,9 @@ export function TrainerAssignmentsPage() {
         : Number(y.counts.toGrade > 0) - Number(x.counts.toGrade > 0) || new Date(y.dueAt).getTime() - new Date(x.dueAt).getTime(),
     )
   const paged = paginate(visible, page)
+  const [layout, setLayout] = useLayout('trainer-assignments')
+  const selection = useSelection(paged.rows.map((a) => a.id))
+  const chosen = paged.rows.filter((a) => selection.has(a.id))
   const canCreate = query.data?.canCreate ?? false
 
   const newButton = (
@@ -134,6 +142,14 @@ export function TrainerAssignmentsPage() {
               },
             ]}
           />
+          <div className="-mt-1 flex justify-end">
+            <LayoutSwitch value={layout} onChange={setLayout} />
+          </div>
+          <BulkBar
+            selection={selection}
+            noun={['assignment', 'assignments']}
+            actions={[{ label: 'Export CSV', icon: <Download aria-hidden className="size-4" />, run: async () => assignmentsCsv(chosen, timeZone) }]}
+          />
           <Panel className="gap-0 max-md:py-2">
             {visible.length === 0 ? (
               <StatePanel
@@ -141,14 +157,55 @@ export function TrainerAssignmentsPage() {
                 title={filter === 'grade' ? 'You’re all caught up' : 'Nothing here'}
                 description={filter === 'grade' ? 'Every submission has a grade.' : 'Try another filter.'}
               />
+            ) : layout === 'grid' ? (
+              <div className="py-2">
+                <CardGrid label="Assignments">
+                  {paged.rows.map((a) => {
+                    const next = action(a)
+                    return (
+                      <ItemCard
+                        key={a.id}
+                        to={next.to}
+                        title={a.title}
+                        subtitle={`${a.course.name} · ${a.cohort.name}`}
+                        badge={
+                          <>
+                            <Badge tone={a.status === 'open' ? 'info' : 'neutral'}>
+                              {a.status === 'open' ? 'Open' : a.status === 'closed' ? 'Past due' : 'Draft'}
+                            </Badge>
+                            {a.counts.toGrade > 0 && <Badge tone="warning">{a.counts.toGrade} to grade</Badge>}
+                          </>
+                        }
+                        select={{ checked: selection.has(a.id), onChange: () => selection.toggle(a.id) }}
+                        facts={[
+                          { label: 'Due', value: formatDay(a.dueAt, timeZone) },
+                          { label: 'Submitted', value: a.status === 'draft' ? 'Draft' : `${a.counts.submitted} of ${a.counts.expected}` },
+                          { label: 'To grade', value: a.status === 'draft' ? '—' : a.counts.toGrade },
+                          { label: 'Grading', value: a.scaleLabel },
+                        ]}
+                        footer={
+                          <Link to={next.to} className="relative z-[1] inline-flex items-center gap-1 text-caption-strong text-brand-text hover:underline">
+                            {next.label}
+                            <ChevronRightIcon size={14} />
+                          </Link>
+                        }
+                      />
+                    )
+                  })}
+                </CardGrid>
+              </div>
             ) : (
               <>
                 <div className="max-md:hidden">
-                  <Table columns={columns}>
+                  <Table columns={columns} select={{ checked: selection.header, onChange: selection.toggleAll, label: 'Select all assignments on this page' }}>
                     {paged.rows.map((a) => {
                       const next = action(a)
                       return (
-                        <Row key={a.id} to={next.to}>
+                        <Row
+                          key={a.id}
+                          to={next.to}
+                          select={{ checked: selection.has(a.id), onChange: () => selection.toggle(a.id), label: `Select ${a.title}` }}
+                        >
                           <Cell>
                             <Stacked primary={a.title} secondary={`${a.course.name} · ${a.cohort.name}`} />
                           </Cell>

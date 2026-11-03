@@ -12,6 +12,12 @@ import { formatDay, formatTime, plural } from '@/lib/format'
 import { paginate } from '@/lib/paginate'
 import { initials } from '@/lib/people'
 import { CoursesHeader } from '@/pages/admin/sessions/CoursesHeader'
+import { Bell, Download } from 'lucide-react'
+import { BulkBar, CardGrid, ItemCard, LayoutSwitch } from '@/components/collection/Collection'
+import { useLayout } from '@/components/collection/layout'
+import { downloadCsv, runBulk, useSelection } from '@/components/collection/selection'
+import { useQueryClient } from '@tanstack/react-query'
+import { api, ApiError } from '@/lib/api'
 import { reportBadge, useRemind, useReportPaths, useReports, type ReportList, type ReportRow, type ReportState } from './data'
 
 type Filter = 'all' | ReportState
@@ -89,6 +95,22 @@ function ReportsBody({
   const visible = data.reports.filter((r) => filter === 'all' || r.state === filter)
   const paged = paginate(visible, page)
   const overdue = data.reports.filter((r) => r.state === 'overdue')
+  const [layout, setLayout] = useLayout(paths.trainer ? 'trainer-reports' : 'session-reports')
+  const selection = useSelection(paged.rows.map((r) => r.sessionId))
+  const chosen = paged.rows.filter((r) => selection.has(r.sessionId))
+  const client = useQueryClient()
+  const label = (r: ReportRow) => `${r.course}, ${formatDay(r.startsAt, timeZone)}`
+  const remindAll = async () => {
+    const o = await runBulk('Reminder sent', chosen, label, (r) =>
+      r.state === 'submitted'
+        ? Promise.reject(new ApiError(409, 'submitted', 'Already submitted.'))
+        : !r.trainer
+          ? Promise.reject(new ApiError(409, 'no_trainer', 'No trainer to remind.'))
+          : api(`/v1/session-reports/${r.sessionId}/remind`, { method: 'POST' }),
+    )
+    await client.invalidateQueries({ queryKey: ['reports'] })
+    return o
+  }
   const columns: Column[] = [
     { label: 'Session' },
     ...(paths.trainer ? [] : [{ label: 'Trainer', width: 200, hideBelow: 'lg' as const }]),
@@ -144,15 +166,58 @@ function ReportsBody({
           ]}
         />
       )}
-      <FilterChips
-        label="Report"
-        value={filter}
-        onChange={onFilter}
-        options={[
-          { value: 'all', label: 'All', count: data.reports.length },
-          { value: 'due', label: 'Due', count: counts.due },
-          { value: 'overdue', label: 'Overdue', count: counts.overdue },
-          { value: 'submitted', label: 'Submitted', count: counts.submitted },
+      <div className="flex items-center gap-3 max-md:flex-col max-md:items-stretch">
+        <FilterChips
+          label="Report"
+          value={filter}
+          onChange={onFilter}
+          options={[
+            { value: 'all', label: 'All', count: data.reports.length },
+            { value: 'due', label: 'Due', count: counts.due },
+            { value: 'overdue', label: 'Overdue', count: counts.overdue },
+            { value: 'submitted', label: 'Submitted', count: counts.submitted },
+          ]}
+        />
+        <div className="flex-1" />
+        <LayoutSwitch value={layout} onChange={setLayout} />
+      </div>
+      <BulkBar
+        selection={selection}
+        noun={['report', 'reports']}
+        actions={[
+          {
+            label: 'Export CSV',
+            icon: <Download aria-hidden className="size-4" />,
+            run: async () =>
+              downloadCsv(
+                'Session reports.csv',
+                ['Course', 'Cohort', 'Session', 'Date', 'Trainer', 'Due', 'Report', 'Submitted'],
+                chosen.map((r) => [
+                  r.course,
+                  r.cohort.name,
+                  r.number ?? '',
+                  formatDay(r.startsAt, timeZone),
+                  r.trainer?.name ?? '',
+                  `${formatDay(r.dueAt, timeZone)} ${formatTime(r.dueAt, timeZone)}`,
+                  r.state,
+                  r.submittedAt ? formatDay(r.submittedAt, timeZone) : '',
+                ]),
+              ),
+          },
+          ...(!paths.trainer
+            ? [
+                {
+                  label: 'Send reminder',
+                  icon: <Bell aria-hidden className="size-4" />,
+                  confirm: {
+                    title: 'Send reminders?',
+                    body: 'Each ticked report that isn’t submitted yet gets an email to its trainer. Submitted ones are skipped.',
+                    button: 'Send reminders',
+                  },
+                  run: remindAll,
+                },
+              ]
+            : []),
         ]}
       />
       <Panel className="gap-0 max-md:py-2">
@@ -160,12 +225,36 @@ function ReportsBody({
           <p role="status" className="p-8 text-center text-body text-secondary">
             No reports here.
           </p>
+        ) : layout === 'grid' ? (
+          <div className="py-2">
+            <CardGrid label="Session reports">
+              {paged.rows.map((r) => (
+                <ItemCard
+                  key={r.sessionId}
+                  to={paths.report(r.sessionId)}
+                  title={r.course}
+                  subtitle={sessionLine(r, timeZone)}
+                  badge={<StateBadge row={r} />}
+                  select={{ checked: selection.has(r.sessionId), onChange: () => selection.toggle(r.sessionId) }}
+                  actions={<RowAction row={r} canWrite={data.canWrite} />}
+                  facts={[
+                    ...(!paths.trainer ? [{ label: 'Trainer', value: r.trainer?.name ?? 'No trainer' }] : []),
+                    { label: 'Due', value: `${formatDay(r.dueAt, timeZone)}, ${formatTime(r.dueAt, timeZone)}` },
+                  ]}
+                />
+              ))}
+            </CardGrid>
+          </div>
         ) : (
           <>
             <div className="max-md:hidden">
-              <Table columns={columns}>
+              <Table columns={columns} select={{ checked: selection.header, onChange: selection.toggleAll, label: 'Select all reports on this page' }}>
                 {paged.rows.map((r) => (
-                  <Row key={r.sessionId} to={paths.report(r.sessionId)}>
+                  <Row
+                    key={r.sessionId}
+                    to={paths.report(r.sessionId)}
+                    select={{ checked: selection.has(r.sessionId), onChange: () => selection.toggle(r.sessionId), label: `Select ${label(r)}` }}
+                  >
                     <Cell>
                       <Stacked primary={r.course} secondary={sessionLine(r, timeZone)} />
                     </Cell>

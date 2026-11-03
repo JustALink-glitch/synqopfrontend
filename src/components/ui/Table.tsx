@@ -18,11 +18,39 @@ const hide = { lg: 'max-lg:hidden', xl: 'max-xl:hidden' }
  * Data table (§09): subtle header row (32px, 12 Medium), rows with a bottom border, 10px/12px padding.
  * Rows open their `to` link when clicked; the first cell should hold a real <Link> for keyboards.
  */
-export function Table({ columns, children, className }: { columns: Column[]; children: ReactNode; className?: string }) {
+/** A row's or the header's tick box. `mixed` shows the dash when some rows are ticked. */
+export interface Selectable {
+  checked: boolean | 'mixed'
+  onChange: () => void
+  label: string
+}
+
+export function SelectBox({ checked, onChange, label }: Selectable) {
+  return (
+    <input
+      type="checkbox"
+      aria-label={label}
+      checked={checked === true}
+      ref={(el) => {
+        if (el) el.indeterminate = checked === 'mixed'
+      }}
+      onChange={onChange}
+      onClick={(e) => e.stopPropagation()}
+      className="size-4 cursor-pointer rounded-[4px] border border-strong accent-[var(--color-brand)] align-middle focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none"
+    />
+  )
+}
+
+export function Table({ columns, children, className, select }: { columns: Column[]; children: ReactNode; className?: string; select?: Selectable }) {
   return (
     <table className={clsx('w-full table-fixed border-separate border-spacing-0', className)}>
       <thead>
         <tr className="bg-surface-subtle">
+          {select && (
+            <th scope="col" style={{ width: 40 }} className="h-8 rounded-l-sm pl-3">
+              <SelectBox {...select} />
+            </th>
+          )}
           {columns.map((column, index) => (
             <th
               key={column.label || index}
@@ -30,7 +58,7 @@ export function Table({ columns, children, className }: { columns: Column[]; chi
               style={column.width ? { width: column.width } : undefined}
               className={clsx(
                 'h-8 px-3 text-left text-caption-strong font-medium whitespace-nowrap text-secondary',
-                index === 0 && 'rounded-l-sm',
+                index === 0 && !select && 'rounded-l-sm',
                 index === columns.length - 1 && 'rounded-r-sm',
                 column.align === 'right' && 'text-right',
                 column.hideBelow && hide[column.hideBelow],
@@ -46,16 +74,23 @@ export function Table({ columns, children, className }: { columns: Column[]; chi
   )
 }
 
-export function Row({ to, children }: { to?: string; children: ReactNode }) {
+export function Row({ to, children, select }: { to?: string; children: ReactNode; select?: Selectable }) {
   const navigate = useNavigate()
   return (
     <tr
       onClick={to ? () => navigate(to) : undefined}
+      aria-selected={select ? select.checked === true : undefined}
       className={clsx(
         '[&>td]:border-b [&>td]:border-default [&>td]:px-3 [&>td]:py-2.5 [&>td]:align-middle last:[&>td]:border-b-0',
         to && 'cursor-pointer hover:bg-surface-hover',
+        select?.checked === true && 'bg-brand-subtle/40',
       )}
     >
+      {select && (
+        <td className="!pr-0" onClick={(e) => e.stopPropagation()}>
+          <SelectBox {...select} />
+        </td>
+      )}
       {children}
     </tr>
   )

@@ -13,6 +13,12 @@ import { paginate } from '@/lib/paginate'
 import { ProgrammeStatusBadge } from './badges'
 import { useProgrammes, type Programme } from './data'
 import { coursesSummary } from './labels'
+import { Archive, ArchiveRestore, Download, Trash2 } from 'lucide-react'
+import { BulkBar, CardGrid, ItemCard, LayoutSwitch, RowActions } from '@/components/collection/Collection'
+import { useLayout } from '@/components/collection/layout'
+import { downloadCsv, runBulk, useSelection } from '@/components/collection/selection'
+import { api } from '@/lib/api'
+import { deleteForever, useRefreshStructure } from './data'
 
 const DESCRIPTION = 'Programmes group cohorts that follow the same curriculum.'
 type Filter = 'all' | 'active' | 'draft' | 'archived'
@@ -24,7 +30,7 @@ const columns: Column[] = [
   { label: 'Participants', width: 110, align: 'right' },
   { label: 'Attendance, 4 wks', width: 140, align: 'right', hideBelow: 'xl' },
   { label: 'Needs attention', width: 130, align: 'right', hideBelow: 'xl' },
-  { label: '', width: 80 },
+  { label: '', width: 56, align: 'right' },
 ]
 
 /** "2 active · 1 upcoming". */
@@ -59,6 +65,52 @@ export function ProgrammesPage() {
   const term = search.trim().toLowerCase()
   const visible = all.filter((p) => (filter === 'all' ? p.status !== 'archived' : p.status === filter) && (!term || p.name.toLowerCase().includes(term)))
   const paged = paginate(visible, page)
+  const [layout, setLayout] = useLayout('programmes')
+  const selection = useSelection(paged.rows.map((p) => p.id))
+  const chosen = paged.rows.filter((p) => selection.has(p.id))
+  const refresh = useRefreshStructure()
+  const archiving = filter === 'archived'
+
+  async function bulk(action: string, run: (p: Programme) => Promise<unknown>) {
+    const outcome = await runBulk(action, chosen, (p) => p.name, run)
+    await refresh()
+    return outcome
+  }
+
+  const exportCsv = () =>
+    downloadCsv(
+      'Programmes.csv',
+      ['Programme', 'Status', 'Cohorts', 'Active cohorts', 'Participants', 'Attendance (4 weeks)', 'Needs attention', 'Courses'],
+      chosen.map((p) => [
+        p.name,
+        p.status,
+        p.cohorts.total,
+        p.cohorts.active,
+        p.participants,
+        p.attendance4w === null ? '' : `${p.attendance4w}%`,
+        p.needsAttention ?? 0,
+        p.courseNames.join('; '),
+      ]),
+    )
+
+  const rowActions = (p: Programme) => (
+    <RowActions
+      label={p.name}
+      items={[
+        { label: 'Open', onSelect: () => navigate(p.id) },
+        ...(p.status !== 'archived' ? [{ label: 'Edit', onSelect: () => navigate(`${p.id}/edit`) }] : []),
+        p.status === 'archived'
+          ? { label: 'Restore', onSelect: () => void bulkOne('Restored', p, () => api(`/v1/programmes/${p.id}/restore`, { method: 'POST' })) }
+          : { label: 'Archive', onSelect: () => void bulkOne('Archived', p, () => api(`/v1/programmes/${p.id}/archive`, { method: 'POST' })) },
+      ]}
+    />
+  )
+  const [single, setSingle] = useState<string | null>(null)
+  async function bulkOne(action: string, p: Programme, run: () => Promise<unknown>) {
+    const o = await runBulk(action, [p], (x) => x.name, run)
+    await refresh()
+    setSingle(o.skipped.length ? `${p.name}: ${o.skipped[0]!.reason}` : null)
+  }
 
   const newButton = (
     <Button icon={<PlusIcon size={16} />} onClick={() => navigate('new')}>
@@ -126,7 +178,44 @@ export function ProgrammesPage() {
                 setPage(1)
               }}
             />
+            <LayoutSwitch value={layout} onChange={setLayout} />
           </div>
+          {single && <AlertBanner tone="error" title={single} />}
+          <BulkBar
+            selection={selection}
+            noun={['programme', 'programmes']}
+            actions={[
+              { label: 'Export CSV', icon: <Download aria-hidden className="size-4" />, run: async () => exportCsv() },
+              archiving
+                ? {
+                    label: 'Restore',
+                    icon: <ArchiveRestore aria-hidden className="size-4" />,
+                    run: () => bulk('Restored', (p) => api(`/v1/programmes/${p.id}/restore`, { method: 'POST' })),
+                  }
+                : {
+                    label: 'Archive',
+                    icon: <Archive aria-hidden className="size-4" />,
+                    confirm: {
+                      title: `Archive ${plural(selection.count, 'programme')}?`,
+                      body: 'They become read-only and move to the Archived filter. Programmes with a running or upcoming cohort are skipped. You can restore them later.',
+                      button: 'Archive',
+                    },
+                    run: () => bulk('Archived', (p) => api(`/v1/programmes/${p.id}/archive`, { method: 'POST' })),
+                  },
+              {
+                label: 'Delete permanently',
+                icon: <Trash2 aria-hidden className="size-4" />,
+                destructive: true,
+                confirm: {
+                  title: `Delete ${plural(selection.count, 'programme')} permanently?`,
+                  body: 'Only programmes with nothing recorded (no attendance, submissions, reports or certificates) are deleted, with their cohorts and courses. The rest are skipped, and you’ll see why. This can’t be undone.',
+                  button: 'Delete permanently',
+                  typed: 'delete',
+                },
+                run: () => bulk('Deleted', (p) => deleteForever('programmes', p.id)),
+              },
+            ]}
+          />
 
           <Panel className="gap-0 max-md:py-2">
             {visible.length === 0 ? (
@@ -146,65 +235,93 @@ export function ProgrammesPage() {
               )
             ) : (
               <>
-                <div className="max-md:hidden">
-                  <Table columns={columns}>
-                    {paged.rows.map((p) => (
-                      <Row key={p.id} to={p.id}>
-                        <Cell>
-                          <Stacked
-                            primary={
-                              <Link
-                                to={p.id}
-                                onClick={(e) => e.stopPropagation()}
-                                className="hover:underline focus-visible:underline focus-visible:outline-none"
-                              >
-                                {p.name}
-                              </Link>
-                            }
-                            secondary={coursesSummary(p.courseNames)}
-                          />
-                        </Cell>
-                        <Cell>
-                          <ProgrammeStatusBadge status={p.status} />
-                        </Cell>
-                        <Cell>
-                          <Stacked primary={p.cohorts.total ? plural(p.cohorts.total, 'cohort') : 'No cohorts'} secondary={cohortBreakdown(p)} />
-                        </Cell>
-                        <Cell align="right" className="text-body-strong">
-                          {p.cohorts.total ? p.participants : '—'}
-                        </Cell>
-                        <Cell align="right" hideBelow="xl">
-                          <Percent value={p.attendance4w} />
-                        </Cell>
-                        <Cell align="right" hideBelow="xl" className={p.needsAttention ? 'text-body-strong' : 'text-muted'}>
-                          {p.needsAttention || '—'}
-                        </Cell>
-                        <Cell>
-                          <span className="inline-flex items-center gap-1 text-caption-strong text-brand-text">
-                            {p.status === 'draft' ? 'Set up' : 'View'}
-                            <ChevronRightIcon size={14} />
-                          </span>
-                        </Cell>
-                      </Row>
-                    ))}
-                  </Table>
-                </div>
-                <ul className="md:hidden">
-                  {paged.rows.map((p) => (
-                    <li key={p.id} className="border-b border-default last:border-b-0">
-                      <Link to={p.id} className="flex items-center gap-3 py-3">
-                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <span className="truncate text-body-strong text-primary">{p.name}</span>
-                          <span className="truncate text-caption text-secondary">
-                            {p.cohorts.total ? plural(p.cohorts.total, 'cohort') : 'No cohorts'} · {coursesSummary(p.courseNames)}
-                          </span>
-                        </span>
-                        <ProgrammeStatusBadge status={p.status} />
-                        <ChevronRightIcon size={16} className="shrink-0 text-icon-muted" />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                {layout === 'grid' ? (
+                  <div className="py-2">
+                    <CardGrid label="Programmes">
+                      {paged.rows.map((p) => (
+                        <ItemCard
+                          key={p.id}
+                          to={p.id}
+                          title={p.name}
+                          subtitle={coursesSummary(p.courseNames)}
+                          badge={<ProgrammeStatusBadge status={p.status} />}
+                          select={{ checked: selection.has(p.id), onChange: () => selection.toggle(p.id) }}
+                          actions={rowActions(p)}
+                          facts={[
+                            { label: 'Cohorts', value: p.cohorts.total ? `${p.cohorts.total} · ${cohortBreakdown(p)}` : 'None' },
+                            { label: 'Participants', value: p.cohorts.total ? p.participants : '—' },
+                            { label: 'Attendance, 4 wks', value: <Percent value={p.attendance4w} /> },
+                            { label: 'Needs attention', value: p.needsAttention || '—' },
+                          ]}
+                        />
+                      ))}
+                    </CardGrid>
+                  </div>
+                ) : (
+                  <>
+                    <div className="max-md:hidden">
+                      <Table
+                        columns={columns}
+                        select={{ checked: selection.header, onChange: selection.toggleAll, label: 'Select all programmes on this page' }}
+                      >
+                        {paged.rows.map((p) => (
+                          <Row
+                            key={p.id}
+                            to={p.id}
+                            select={{ checked: selection.has(p.id), onChange: () => selection.toggle(p.id), label: `Select ${p.name}` }}
+                          >
+                            <Cell>
+                              <Stacked
+                                primary={
+                                  <Link
+                                    to={p.id}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="hover:underline focus-visible:underline focus-visible:outline-none"
+                                  >
+                                    {p.name}
+                                  </Link>
+                                }
+                                secondary={coursesSummary(p.courseNames)}
+                              />
+                            </Cell>
+                            <Cell>
+                              <ProgrammeStatusBadge status={p.status} />
+                            </Cell>
+                            <Cell>
+                              <Stacked primary={p.cohorts.total ? plural(p.cohorts.total, 'cohort') : 'No cohorts'} secondary={cohortBreakdown(p)} />
+                            </Cell>
+                            <Cell align="right" className="text-body-strong">
+                              {p.cohorts.total ? p.participants : '—'}
+                            </Cell>
+                            <Cell align="right" hideBelow="xl">
+                              <Percent value={p.attendance4w} />
+                            </Cell>
+                            <Cell align="right" hideBelow="xl" className={p.needsAttention ? 'text-body-strong' : 'text-muted'}>
+                              {p.needsAttention || '—'}
+                            </Cell>
+                            <Cell align="right">{rowActions(p)}</Cell>
+                          </Row>
+                        ))}
+                      </Table>
+                    </div>
+                    <ul className="md:hidden">
+                      {paged.rows.map((p) => (
+                        <li key={p.id} className="border-b border-default last:border-b-0">
+                          <Link to={p.id} className="flex items-center gap-3 py-3">
+                            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                              <span className="truncate text-body-strong text-primary">{p.name}</span>
+                              <span className="truncate text-caption text-secondary">
+                                {p.cohorts.total ? plural(p.cohorts.total, 'cohort') : 'No cohorts'} · {coursesSummary(p.courseNames)}
+                              </span>
+                            </span>
+                            <ProgrammeStatusBadge status={p.status} />
+                            <ChevronRightIcon size={16} className="shrink-0 text-icon-muted" />
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </>
             )}
             <TableFooter summary={plural(visible.length, 'programme')} page={paged.page} pageCount={paged.pageCount} onPage={setPage} />

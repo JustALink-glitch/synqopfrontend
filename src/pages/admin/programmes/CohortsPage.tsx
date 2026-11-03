@@ -14,6 +14,12 @@ import { paginate } from '@/lib/paginate'
 import { CohortStatusBadge } from './badges'
 import { useCohorts, useProgrammes } from './data'
 import { DeliveryProgress } from './DeliveryProgress'
+import { Archive, ArchiveRestore, Download, Trash2 } from 'lucide-react'
+import { BulkBar, CardGrid, ItemCard, LayoutSwitch, RowActions } from '@/components/collection/Collection'
+import { useLayout } from '@/components/collection/layout'
+import { downloadCsv, runBulk, useSelection } from '@/components/collection/selection'
+import { api } from '@/lib/api'
+import { deleteForever, useRefreshStructure, type CohortSummary } from './data'
 
 type Filter = 'all' | 'active' | 'upcoming' | 'completed' | 'archived'
 
@@ -25,6 +31,7 @@ const columns: Column[] = [
   { label: 'Attendance, 4 wks', width: 130, align: 'right', hideBelow: 'xl' },
   { label: 'Needs attention', width: 120, align: 'right', hideBelow: 'xl' },
   { label: 'Next session', width: 160, hideBelow: 'xl' },
+  { label: '', width: 56, align: 'right' },
 ]
 
 /** /admin/cohorts — A3.01 Cohorts, A3.01e empty. */
@@ -51,6 +58,41 @@ export function CohortsPage() {
     return statusMatch && (!term || c.name.toLowerCase().includes(term) || c.programme.name.toLowerCase().includes(term))
   })
   const paged = paginate(visible, page)
+  const [layout, setLayout] = useLayout('cohorts')
+  const selection = useSelection(paged.rows.map((c) => c.id))
+  const chosen = paged.rows.filter((c) => selection.has(c.id))
+  const refresh = useRefreshStructure()
+  const [single, setSingle] = useState<string | null>(null)
+
+  async function bulk(action: string, items: CohortSummary[], run: (c: CohortSummary) => Promise<unknown>) {
+    const outcome = await runBulk(action, items, (c) => c.name, run)
+    await refresh()
+    return outcome
+  }
+  async function one(action: string, c: CohortSummary, run: (c: CohortSummary) => Promise<unknown>) {
+    const o = await bulk(action, [c], run)
+    setSingle(o.skipped.length ? `${c.name}: ${o.skipped[0]!.reason}` : null)
+  }
+  const archive = (c: CohortSummary) => api(`/v1/cohorts/${c.id}/archive`, { method: 'POST' })
+  const restore = (c: CohortSummary) => api(`/v1/cohorts/${c.id}/restore`, { method: 'POST' })
+  const nextLabel = (c: CohortSummary) =>
+    c.nextSession ? `${relativeDay(c.nextSession.startsAt, timeZone)}, ${formatTime(c.nextSession.startsAt, timeZone)}` : 'None scheduled'
+
+  const rowActions = (c: CohortSummary) => (
+    <RowActions
+      label={c.name}
+      items={[
+        { label: 'Open', onSelect: () => navigate(c.id) },
+        ...(c.status !== 'archived'
+          ? [
+              { label: 'Edit', onSelect: () => navigate(`${c.id}/edit`) },
+              { label: 'Schedule session', onSelect: () => navigate(`/admin/courses/sessions/new?cohort=${c.id}`) },
+              { label: 'Archive', onSelect: () => void one('Archived', c, archive) },
+            ]
+          : [{ label: 'Restore', onSelect: () => void one('Restored', c, restore) }]),
+      ]}
+    />
+  )
 
   const newButton = (
     <Button
@@ -135,16 +177,107 @@ export function CohortsPage() {
                 setPage(1)
               }}
             />
+            <LayoutSwitch value={layout} onChange={setLayout} />
           </div>
+          {single && <AlertBanner tone="error" title={single} />}
+          <BulkBar
+            selection={selection}
+            noun={['cohort', 'cohorts']}
+            actions={[
+              {
+                label: 'Export CSV',
+                icon: <Download aria-hidden className="size-4" />,
+                run: async () =>
+                  downloadCsv(
+                    'Cohorts.csv',
+                    [
+                      'Cohort',
+                      'Programme',
+                      'Status',
+                      'Starts',
+                      'Ends',
+                      'Participants',
+                      'Sessions held',
+                      'Sessions planned',
+                      'Attendance (4 weeks)',
+                      'Needs attention',
+                    ],
+                    chosen.map((c) => [
+                      c.name,
+                      c.programme.name,
+                      c.status,
+                      c.startsOn,
+                      c.endsOn,
+                      c.participants,
+                      c.heldSessions,
+                      c.plannedSessions,
+                      c.attendance4w === null ? '' : `${c.attendance4w}%`,
+                      c.needsAttention ?? 0,
+                    ]),
+                  ),
+              },
+              filter === 'archived'
+                ? { label: 'Restore', icon: <ArchiveRestore aria-hidden className="size-4" />, run: () => bulk('Restored', chosen, restore) }
+                : {
+                    label: 'Archive',
+                    icon: <Archive aria-hidden className="size-4" />,
+                    confirm: {
+                      title: `Archive ${plural(selection.count, 'cohort')}?`,
+                      body: 'They become read-only. Running cohorts are skipped until they end. You can restore them later.',
+                      button: 'Archive',
+                    },
+                    run: () => bulk('Archived', chosen, archive),
+                  },
+              {
+                label: 'Delete permanently',
+                icon: <Trash2 aria-hidden className="size-4" />,
+                destructive: true,
+                confirm: {
+                  title: `Delete ${plural(selection.count, 'cohort')} permanently?`,
+                  body: 'Only cohorts with nothing recorded (no attendance, submissions, reports or certificates) are deleted, with their sessions and enrolments. The rest are skipped, and you’ll see why. This can’t be undone.',
+                  button: 'Delete permanently',
+                  typed: 'delete',
+                },
+                run: () => bulk('Deleted', chosen, (c) => deleteForever('cohorts', c.id)),
+              },
+            ]}
+          />
           <Panel className="gap-0 max-md:py-2">
             {visible.length === 0 ? (
               <StatePanel kind="no-results" title="No cohorts match" description="Try another name, or clear the filter." />
+            ) : layout === 'grid' ? (
+              <div className="py-2">
+                <CardGrid label="Cohorts">
+                  {paged.rows.map((c) => (
+                    <ItemCard
+                      key={c.id}
+                      to={c.id}
+                      title={c.name}
+                      subtitle={`${c.programme.name} · ${formatDateRange(c.startsOn, c.endsOn)}`}
+                      badge={<CohortStatusBadge status={c.status} />}
+                      select={{ checked: selection.has(c.id), onChange: () => selection.toggle(c.id) }}
+                      actions={rowActions(c)}
+                      facts={[
+                        { label: 'Participants', value: c.participants },
+                        { label: 'Sessions', value: `${c.heldSessions} of ${c.plannedSessions || '—'}` },
+                        { label: 'Attendance, 4 wks', value: <Percent value={c.attendance4w} /> },
+                        { label: 'Needs attention', value: c.status === 'active' ? (c.needsAttention ?? 0) : '—' },
+                      ]}
+                      footer={`Next session: ${nextLabel(c)}`}
+                    />
+                  ))}
+                </CardGrid>
+              </div>
             ) : (
               <>
                 <div className="max-md:hidden">
-                  <Table columns={columns}>
+                  <Table columns={columns} select={{ checked: selection.header, onChange: selection.toggleAll, label: 'Select all cohorts on this page' }}>
                     {paged.rows.map((cohort) => (
-                      <Row key={cohort.id} to={cohort.id}>
+                      <Row
+                        key={cohort.id}
+                        to={cohort.id}
+                        select={{ checked: selection.has(cohort.id), onChange: () => selection.toggle(cohort.id), label: `Select ${cohort.name}` }}
+                      >
                         <Cell>
                           <Stacked
                             primary={
@@ -184,6 +317,7 @@ export function CohortsPage() {
                             'None scheduled'
                           )}
                         </Cell>
+                        <Cell align="right">{rowActions(cohort)}</Cell>
                       </Row>
                     ))}
                   </Table>

@@ -12,13 +12,19 @@ import { Cell, Row, Stacked, Table, TableFooter, type Column } from '@/component
 import { plural } from '@/lib/format'
 import { paginate } from '@/lib/paginate'
 import { initials } from '@/lib/people'
-import { useCourses, useProgrammes } from './data'
+import { deleteForever, useCourses, useProgrammes, useRefreshStructure, type Course } from './data'
+import { Archive, ArchiveRestore, Download, Trash2 } from 'lucide-react'
+import { BulkBar, CardGrid, ItemCard, LayoutSwitch, RowActions } from '@/components/collection/Collection'
+import { useLayout } from '@/components/collection/layout'
+import { downloadCsv, runBulk, useSelection } from '@/components/collection/selection'
+import { api } from '@/lib/api'
 
 const columns: Column[] = [
   { label: 'Course' },
   { label: 'Cohorts', width: 240, hideBelow: 'lg' },
   { label: 'Lead trainer', width: 220 },
   { label: 'Sessions per cohort', width: 160, align: 'right', hideBelow: 'xl' },
+  { label: '', width: 56, align: 'right' },
 ]
 
 /** /admin/courses — A2.01 Courses, A2.01e empty. */
@@ -40,6 +46,36 @@ export function CoursesPage() {
   const term = search.trim().toLowerCase()
   const visible = all.filter((c) => (programme === 'all' || c.programme.id === programme) && (!term || c.name.toLowerCase().includes(term)))
   const paged = paginate(visible, page)
+  const [layout, setLayout] = useLayout('courses')
+  const selection = useSelection(paged.rows.map((c) => c.id))
+  const chosen = paged.rows.filter((c) => selection.has(c.id))
+  const refresh = useRefreshStructure()
+  const [single, setSingle] = useState<string | null>(null)
+  const archive = (c: Course) => api(`/v1/courses/${c.id}/archive`, { method: 'POST' })
+  const restore = (c: Course) => api(`/v1/courses/${c.id}/restore`, { method: 'POST' })
+  async function bulk(action: string, items: Course[], run: (c: Course) => Promise<unknown>) {
+    const outcome = await runBulk(action, items, (c) => c.name, run)
+    await refresh()
+    return outcome
+  }
+  async function one(action: string, c: Course, run: (c: Course) => Promise<unknown>) {
+    const o = await bulk(action, [c], run)
+    setSingle(o.skipped.length ? `${c.name}: ${o.skipped[0]!.reason}` : null)
+  }
+  const rowActions = (c: Course) => (
+    <RowActions
+      label={c.name}
+      items={[
+        { label: 'Open', onSelect: () => navigate(`/admin/courses/library/${c.id}`) },
+        ...(showArchived
+          ? [{ label: 'Restore', onSelect: () => void one('Restored', c, restore) }]
+          : [
+              { label: 'Edit', onSelect: () => navigate(`/admin/courses/library/${c.id}/edit`) },
+              { label: 'Archive', onSelect: () => void one('Archived', c, archive) },
+            ]),
+      ]}
+    />
+  )
 
   const newButton = (
     <Button
@@ -146,7 +182,49 @@ export function CoursesPage() {
                 setPage(1)
               }}
             />
+            <LayoutSwitch value={layout} onChange={setLayout} />
           </div>
+          {single && <AlertBanner tone="error" title={single} />}
+          <BulkBar
+            selection={selection}
+            noun={['course', 'courses']}
+            actions={[
+              {
+                label: 'Export CSV',
+                icon: <Download aria-hidden className="size-4" />,
+                run: async () =>
+                  downloadCsv(
+                    'Courses.csv',
+                    ['Course', 'Programme', 'Cohorts', 'Lead trainer', 'Sessions per cohort'],
+                    chosen.map((c) => [c.name, c.programme.name, c.cohorts.map((h) => h.name).join('; '), c.defaultLead?.name ?? '', c.plannedSessions ?? '']),
+                  ),
+              },
+              showArchived
+                ? { label: 'Restore', icon: <ArchiveRestore aria-hidden className="size-4" />, run: () => bulk('Restored', chosen, restore) }
+                : {
+                    label: 'Archive',
+                    icon: <Archive aria-hidden className="size-4" />,
+                    confirm: {
+                      title: `Archive ${plural(selection.count, 'course')}?`,
+                      body: 'Cohorts that run them keep everything. You can restore them from Archived.',
+                      button: 'Archive',
+                    },
+                    run: () => bulk('Archived', chosen, archive),
+                  },
+              {
+                label: 'Delete permanently',
+                icon: <Trash2 aria-hidden className="size-4" />,
+                destructive: true,
+                confirm: {
+                  title: `Delete ${plural(selection.count, 'course')} permanently?`,
+                  body: 'Only courses with nothing recorded are deleted, with their sessions and assignments. The rest are skipped, and you’ll see why. This can’t be undone.',
+                  button: 'Delete permanently',
+                  typed: 'delete',
+                },
+                run: () => bulk('Deleted', chosen, (c) => deleteForever('courses', c.id)),
+              },
+            ]}
+          />
           <Panel className="gap-0 max-md:py-2">
             {visible.length === 0 ? (
               <StatePanel
@@ -156,10 +234,43 @@ export function CoursesPage() {
                   showArchived && all.length === 0 ? 'Courses you archive show here, ready to restore.' : 'Try another name, or choose All programmes.'
                 }
               />
+            ) : layout === 'grid' ? (
+              <div className="py-2">
+                <CardGrid label="Courses">
+                  {paged.rows.map((c) => (
+                    <ItemCard
+                      key={c.id}
+                      to={`/admin/courses/library/${c.id}`}
+                      title={c.name}
+                      subtitle={c.programme.name}
+                      select={{ checked: selection.has(c.id), onChange: () => selection.toggle(c.id) }}
+                      actions={rowActions(c)}
+                      facts={[
+                        { label: 'Cohorts', value: c.cohorts.length || 'Not running yet' },
+                        { label: 'Sessions per cohort', value: c.plannedSessions ?? '—' },
+                      ]}
+                      footer={
+                        c.defaultLead ? (
+                          <span className="flex min-w-0 items-center gap-2">
+                            <Avatar initials={initials(c.defaultLead.name)} seed={c.defaultLead.id} />
+                            <span className="truncate">Lead: {c.defaultLead.name}</span>
+                          </span>
+                        ) : (
+                          'No lead trainer yet'
+                        )
+                      }
+                    />
+                  ))}
+                </CardGrid>
+              </div>
             ) : (
-              <Table columns={columns}>
+              <Table columns={columns} select={{ checked: selection.header, onChange: selection.toggleAll, label: 'Select all courses on this page' }}>
                 {paged.rows.map((course) => (
-                  <Row key={course.id} to={`/admin/courses/library/${course.id}`}>
+                  <Row
+                    key={course.id}
+                    to={`/admin/courses/library/${course.id}`}
+                    select={{ checked: selection.has(course.id), onChange: () => selection.toggle(course.id), label: `Select ${course.name}` }}
+                  >
                     <Cell>
                       <Stacked primary={course.name} secondary={course.programme.name} />
                     </Cell>
@@ -183,6 +294,7 @@ export function CoursesPage() {
                     <Cell align="right" hideBelow="xl" className="text-body-strong">
                       {course.plannedSessions ?? '—'}
                     </Cell>
+                    <Cell align="right">{rowActions(course)}</Cell>
                   </Row>
                 ))}
               </Table>
