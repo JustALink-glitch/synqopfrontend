@@ -1,6 +1,8 @@
 import { AlertBanner } from '@/components/ui/AlertBanner'
 import { formatDayWithYear } from '@/lib/format'
 import clsx from 'clsx'
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { FileViewerHost } from '@/components/files/FileViewer'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import logo from '@/assets/synqop-logo.svg'
@@ -44,10 +46,13 @@ export function AppShell({ area }: { area: Area }) {
 
   return (
     <div className="flex min-h-dvh bg-canvas">
-      <aside className="sticky top-0 flex h-dvh w-sidebar shrink-0 flex-col gap-5 border-r border-default bg-surface px-4 pt-5 pb-4 max-md:hidden max-xl:items-center max-xl:px-3">
-        <Link to={`/${area}`} className="rounded-md px-2 py-1 max-xl:hidden" aria-label="Synqop home">
-          <img src={logo} alt="Synqop" width={110} height={33} />
-        </Link>
+      <aside className="sticky top-0 flex h-dvh w-sidebar shrink-0 flex-col gap-5 border-r border-default bg-surface px-4 pt-5 pb-4 max-md:hidden rail:items-center rail:px-3">
+        <div className="flex items-center justify-between gap-2 rail:justify-center">
+          <Link to={`/${area}`} className="rounded-md px-2 py-1 rail:hidden" aria-label="Synqop home">
+            <img src={logo} alt="Synqop" width={110} height={33} />
+          </Link>
+          <RailToggle />
+        </div>
         <OrganisationLabel me={me} area={area} />
         <SidebarNav area={area} items={items} />
       </aside>
@@ -71,15 +76,52 @@ export function AppShell({ area }: { area: Area }) {
         </main>
       </div>
 
+      <FileViewerHost />
       {drawerOpen && <NavigationDrawer me={me} area={area} items={items} onClose={() => setDrawerOpen(false)} />}
     </div>
+  )
+}
+
+const RAIL_KEY = 'synqop:sidebar'
+
+function readRail() {
+  try {
+    return localStorage.getItem(RAIL_KEY) === 'collapsed'
+  } catch {
+    return false
+  }
+}
+
+/** Collapse or open the sidebar on wide screens (pilot feedback, Nov 2026); remembered on this device. */
+function RailToggle() {
+  const [collapsed, setCollapsed] = useState(readRail)
+  useEffect(() => {
+    document.documentElement.dataset.rail = collapsed ? 'on' : 'off'
+    try {
+      localStorage.setItem(RAIL_KEY, collapsed ? 'collapsed' : 'open')
+    } catch {
+      // Private windows: it just isn't remembered.
+    }
+  }, [collapsed])
+  const Icon = collapsed ? PanelLeftOpen : PanelLeftClose
+  return (
+    <button
+      type="button"
+      onClick={() => setCollapsed((c) => !c)}
+      aria-label={collapsed ? 'Open the menu' : 'Collapse the menu'}
+      aria-expanded={!collapsed}
+      title={collapsed ? 'Open the menu' : 'Collapse the menu'}
+      className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-icon hover:bg-surface-hover hover:text-primary focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none max-xl:hidden"
+    >
+      <Icon className="size-[18px]" aria-hidden />
+    </button>
   )
 }
 
 function OrganisationLabel({ me, area, compact }: { me: Me; area: Area; compact?: boolean }) {
   const name = me.organisation?.name ?? ''
   return (
-    <div className={clsx('flex h-[52px] items-center gap-3 rounded-md px-2', !compact && 'max-xl:px-0')} title={name}>
+    <div className={clsx('flex h-[52px] items-center gap-3 rounded-md px-2', !compact && 'rail:px-0')} title={name}>
       {me.organisation?.logoUrl ? (
         <img src={me.organisation.logoUrl} alt="" aria-hidden="true" className="size-8 shrink-0 rounded-sm object-contain" />
       ) : (
@@ -87,7 +129,7 @@ function OrganisationLabel({ me, area, compact }: { me: Me; area: Area; compact?
           {initials(name)}
         </span>
       )}
-      <span className={clsx('flex min-w-0 flex-col', !compact && 'max-xl:sr-only')}>
+      <span className={clsx('flex min-w-0 flex-col', !compact && 'rail:sr-only')}>
         <span className="truncate text-body-emphasis text-primary">{name}</span>
         <span className="truncate text-caption text-secondary">{WORKSPACE_LABEL[area]}</span>
       </span>
@@ -99,7 +141,7 @@ function SidebarNav({ area, items, inDrawer }: { area: Area; items: NavItem[]; i
   const main = items.filter((item) => !item.bottom)
   const bottom = items.filter((item) => item.bottom)
   return (
-    <nav aria-label="Main" className={clsx('flex flex-1 flex-col', !inDrawer && 'max-xl:w-full')}>
+    <nav aria-label="Main" className={clsx('flex flex-1 flex-col', !inDrawer && 'rail:w-full')}>
       <ul className="flex flex-col gap-0.5">
         {main.map((item) => (
           <li key={item.path}>
@@ -129,13 +171,13 @@ function SidebarLink({ area, item, inDrawer }: { area: Area; item: NavItem; inDr
         clsx(
           'relative flex items-center gap-3 rounded-md px-3 text-label-nav tracking-[-0.1px] transition-colors',
           'focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none',
-          inDrawer ? 'h-11' : 'h-10 max-xl:justify-center max-xl:px-0',
+          inDrawer ? 'h-11' : 'h-10 rail:justify-center rail:px-0',
           isActive ? 'bg-surface-selected text-brand-text' : 'text-secondary hover:bg-surface-hover hover:text-primary',
         )
       }
     >
       <Icon size={20} className="shrink-0" />
-      <span className={clsx('truncate', !inDrawer && 'max-xl:sr-only')}>{item.label}</span>
+      <span className={clsx('truncate', !inDrawer && 'rail:sr-only')}>{item.label}</span>
       {area === 'admin' && item.path === 'needs-attention' && <AttentionCount hidden={!inDrawer} />}
       {item.path === 'announcements' && <AnnouncementCount collapsed={!inDrawer} />}
     </NavLink>
@@ -148,7 +190,7 @@ function AttentionCount({ hidden }: { hidden: boolean }) {
   if (!data?.count) return null
   return (
     <span
-      className={clsx('ml-auto rounded-full bg-warning-bg px-2 text-caption-strong text-warning-fg tabular-nums', hidden && 'max-xl:hidden')}
+      className={clsx('ml-auto rounded-full bg-warning-bg px-2 text-caption-strong text-warning-fg tabular-nums', hidden && 'rail:hidden')}
       aria-label={`${data.count} need attention`}
     >
       {data.count}
@@ -163,12 +205,12 @@ function AnnouncementCount({ collapsed }: { collapsed: boolean }) {
   return (
     <>
       <span
-        className={clsx('ml-auto rounded-full bg-brand px-2 text-caption-strong text-on-brand tabular-nums', collapsed && 'max-xl:hidden')}
+        className={clsx('ml-auto rounded-full bg-brand px-2 text-caption-strong text-on-brand tabular-nums', collapsed && 'rail:hidden')}
         aria-label={`${data.unread} new`}
       >
         {data.unread}
       </span>
-      {collapsed && <span aria-hidden="true" className="absolute top-2 right-2 size-2 rounded-full bg-brand xl:hidden" />}
+      {collapsed && <span aria-hidden="true" className="absolute top-2 right-2 size-2 rounded-full bg-brand full:hidden" />}
     </>
   )
 }
@@ -246,7 +288,7 @@ function AccountMenu({ me, area, compact = false }: { me: Me; area: Area; compac
               {me.user.email} · {role}
             </span>
           </div>
-          <MenuLink to={`/${area}/settings`} icon={<UserIcon size={16} />} onSelect={() => setOpen(false)}>
+          <MenuLink to={area === 'admin' ? '/admin/settings/profile' : `/${area}/profile`} icon={<UserIcon size={16} />} onSelect={() => setOpen(false)}>
             Profile &amp; password
           </MenuLink>
           <MenuLink to={`/${area}/settings`} icon={<SettingsIcon size={16} />} onSelect={() => setOpen(false)}>

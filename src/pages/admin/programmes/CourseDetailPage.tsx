@@ -1,3 +1,4 @@
+import { Eye } from 'lucide-react'
 import clsx from 'clsx'
 import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
@@ -9,7 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { ChevronRightIcon, DownloadIcon, PencilIcon, PlusIcon } from '@/components/ui/icons'
 import { PageHeader, Panel, PanelHeader } from '@/components/ui/Page'
 import { Cell, Row, Table } from '@/components/ui/Table'
-import { downloadFile, fileKind, fileSize } from '@/lib/files'
+import { openFile, fileKind, fileSize, viewKind } from '@/lib/files'
 import { formatDay, formatTimeRange, plural } from '@/lib/format'
 import { initials } from '@/lib/people'
 import { SessionStatusBadge } from '@/pages/admin/sessions/SessionRow'
@@ -202,7 +203,7 @@ function ResourcesPanel({ data, limit, onAll, canEdit }: { data: CourseDetail; l
     setFailed(null)
     try {
       if (r.kind === 'link' && r.url) window.open(r.url, '_blank', 'noopener')
-      else await downloadFile(`/v1/courses/${data.course.id}/resources/${r.id}`)
+      else await openFile(`/v1/courses/${data.course.id}/resources/${r.id}`, r.name, r.type)
     } catch {
       setFailed(r.id)
     }
@@ -237,7 +238,11 @@ function ResourcesPanel({ data, limit, onAll, canEdit }: { data: CourseDetail; l
                     </span>
                   </span>
                   {r.kind === 'file' ? (
-                    <DownloadIcon size={16} className="shrink-0 text-icon" />
+                    viewKind(r.name, r.type) ? (
+                      <Eye className="size-4 shrink-0 text-icon" aria-hidden />
+                    ) : (
+                      <DownloadIcon size={16} className="shrink-0 text-icon" />
+                    )
                   ) : (
                     <ChevronRightIcon size={16} className="shrink-0 text-icon" />
                   )}

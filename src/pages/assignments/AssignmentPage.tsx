@@ -9,7 +9,7 @@ import { DetailList } from '@/components/ui/FormLayout'
 import { ArrowRightIcon, ChevronRightIcon, DownloadIcon, MailIcon } from '@/components/ui/icons'
 import { Badge, FilterChips, PageHeader, Panel, PanelHeader } from '@/components/ui/Page'
 import { Cell, Row, Table, TableFooter, type Column } from '@/components/ui/Table'
-import { downloadFile } from '@/lib/files'
+import { openFile } from '@/lib/files'
 import { plural } from '@/lib/format'
 import { paginate } from '@/lib/paginate'
 import { initials } from '@/lib/people'
@@ -320,7 +320,7 @@ function AssignmentView({
               <PanelHeader id="brief-title" title="Brief" />
               {a.brief && <p className="text-body whitespace-pre-line text-primary">{a.brief}</p>}
               {a.files.map((f) => (
-                <FileRow key={f.id} name={f.name} size={f.size} onDownload={() => downloadFile(`/v1/assignments/${a.id}/files/${f.id}`)} />
+                <FileRow key={f.id} name={f.name} size={f.size} onDownload={() => openFile(`/v1/assignments/${a.id}/files/${f.id}`, f.name)} />
               ))}
               {a.links.map((l) => (
                 <a

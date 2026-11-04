@@ -335,7 +335,7 @@ export function ParticipantsPage() {
                       <Row key={p.id} to={p.id} select={{ checked: selection.has(p.id), onChange: () => selection.toggle(p.id), label: `Select ${name(p)}` }}>
                         <Cell>
                           <span className="flex min-w-0 items-center gap-3">
-                            <Avatar initials={initials(p.firstName, p.lastName)} seed={p.id} />
+                            <Avatar initials={initials(p.firstName, p.lastName)} seed={p.id} enlarge={name(p)} />
                             <Stacked
                               primary={
                                 <Link

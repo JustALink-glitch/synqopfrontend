@@ -380,7 +380,14 @@ function ActivityPanel({ data: d }: { data: Overview }) {
               return `${bucketLabel(b.start, a.unit)}: ${b.present} present, ${b.excused} excused, ${b.absent} absent${b.rate !== null ? `, ${b.rate}%` : ''}`
             }}
           />
-          <p className="text-caption text-secondary">% = present ÷ recorded check-ins. Excused counts as not present.</p>
+          <p className="text-caption text-secondary">
+            {(() => {
+              const present = buckets.reduce((n, b) => n + b.present, 0)
+              const recorded = buckets.reduce((n, b) => n + b.present + b.excused + b.absent, 0)
+              return recorded ? `${Math.round((present / recorded) * 100)}% present over this period. ` : ''
+            })()}
+            % = present ÷ recorded check-ins; excused counts as not present.
+          </p>
         </>
       )}
     </Panel>

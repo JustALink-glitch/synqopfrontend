@@ -17,15 +17,20 @@ import { useNotificationPreferences, type NotificationPreference } from '@/pages
 type Errors = Partial<Record<'fullName' | 'phone' | 'bio' | 'current' | 'next' | 'confirm', string>>
 type Area = 'trainer' | 'participant'
 
-/** /trainer/settings and /participant/settings — T9.01 / P8.01 Settings: profile, password, notifications. */
-export function AccountSettingsPage({ area }: { area: Area }) {
+type Section = 'profile' | 'settings'
+
+/**
+ * /trainer/profile, /participant/profile — Profile & password; /trainer/settings, /participant/settings — push and
+ * notifications (T9.01 / P8.01). Split in Nov 2026 so each account-menu item opens its own page.
+ */
+export function AccountSettingsPage({ area, section = 'settings' }: { area: Area; section?: Section }) {
   const { state } = useAuth()
   const prefs = useNotificationPreferences()
   if (state.status !== 'signed-in' || prefs.isPending) return <div aria-busy="true" aria-label="Loading settings" className="h-40" />
   if (prefs.isError) {
     return (
       <>
-        <PageHeader title="Settings" />
+        <PageHeader title={section === 'profile' ? 'Profile & password' : 'Settings'} />
         <Panel>
           <StatePanel
             kind="error"
@@ -37,10 +42,10 @@ export function AccountSettingsPage({ area }: { area: Area }) {
       </>
     )
   }
-  return <SettingsForm area={area} initialPrefs={prefs.data.preferences} />
+  return <SettingsForm key={section} area={area} section={section} initialPrefs={prefs.data.preferences} />
 }
 
-function SettingsForm({ area, initialPrefs }: { area: Area; initialPrefs: NotificationPreference[] }) {
+function SettingsForm({ area, section, initialPrefs }: { area: Area; section: Section; initialPrefs: NotificationPreference[] }) {
   const trainer = area === 'trainer'
   const { state, refresh } = useAuth()
   const client = useQueryClient()
@@ -130,7 +135,11 @@ function SettingsForm({ area, initialPrefs }: { area: Area; initialPrefs: Notifi
         done.push('password')
       }
       if (done.includes('profile')) await refresh()
-      setNotice({ tone: 'success', title: 'Settings saved', body: done.includes('password') ? 'Your new password works from your next sign-in.' : undefined })
+      setNotice({
+        tone: 'success',
+        title: section === 'profile' ? 'Profile saved' : 'Settings saved',
+        body: done.includes('password') ? 'Your new password works from your next sign-in.' : undefined,
+      })
     } catch (error) {
       if (!(error instanceof Error && error.message === 'password')) {
         if (error instanceof ApiError && Array.isArray(error.details)) {
@@ -158,9 +167,13 @@ function SettingsForm({ area, initialPrefs }: { area: Area; initialPrefs: Notifi
   return (
     <>
       <PageHeader
-        title="Settings"
+        title={section === 'profile' ? 'Profile & password' : 'Settings'}
         description={
-          trainer ? 'Your profile, password and notifications. Organisation settings are managed by admins.' : 'Your profile, password and notifications.'
+          section === 'profile'
+            ? 'Your name, photo, contact details and password.'
+            : trainer
+              ? 'How you hear about sessions, reports and your participants. Organisation settings are managed by admins.'
+              : 'How you hear about sessions, assignments and grades.'
         }
       />
       <form onSubmit={onSubmit} noValidate className="flex w-[760px] max-w-full flex-col gap-4">
@@ -169,134 +182,142 @@ function SettingsForm({ area, initialPrefs }: { area: Area; initialPrefs: Notifi
             {notice.body}
           </AlertBanner>
         )}
-        <Panel aria-labelledby="profile-title" className="gap-4">
-          <PanelHeader
-            id="profile-title"
-            title="Profile"
-            description={trainer ? 'Participants and admins see your name, photo and bio.' : 'Your trainers and programme team see this.'}
-          />
-          <ProfilePhoto name={fullName || initialName} />
-          <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
-            <TextField
-              label="Display name"
-              autoComplete="name"
-              value={fullName}
-              maxLength={160}
-              onChange={(e) => set(setFullName, 'fullName')(e.target.value)}
-              error={errors.fullName}
-            />
-            <TextField
-              label="Phone"
-              optional
-              type="tel"
-              autoComplete="tel"
-              value={phone}
-              onChange={(e) => set(setPhone, 'phone')(e.target.value)}
-              error={errors.phone}
-              helper={trainer ? 'Only admins see this.' : 'Only the programme team sees this.'}
-            />
-          </div>
-          <TextField
-            label="Email"
-            value={email}
-            disabled
-            helper={
-              trainer
-                ? `Set by ${me?.organisation?.name ?? 'your organisation'}.`
-                : 'Use this email in Zoom so your attendance counts. Ask your programme team to change it.'
-            }
-          />
-          {trainer && (
-            <TextAreaField
-              label="Short bio"
-              optional
-              value={bio}
-              maxLength={300}
-              onChange={(e) => set(setBio, 'bio')(e.target.value)}
-              error={errors.bio}
-              helper="Shown to participants on your sessions."
-            />
-          )}
-        </Panel>
+        {section === 'profile' && (
+          <>
+            <Panel aria-labelledby="profile-title" className="gap-4">
+              <PanelHeader
+                id="profile-title"
+                title="Profile"
+                description={trainer ? 'Participants and admins see your name, photo and bio.' : 'Your trainers and programme team see this.'}
+              />
+              <ProfilePhoto name={fullName || initialName} />
+              <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
+                <TextField
+                  label="Display name"
+                  autoComplete="name"
+                  value={fullName}
+                  maxLength={160}
+                  onChange={(e) => set(setFullName, 'fullName')(e.target.value)}
+                  error={errors.fullName}
+                />
+                <TextField
+                  label="Phone"
+                  optional
+                  type="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(e) => set(setPhone, 'phone')(e.target.value)}
+                  error={errors.phone}
+                  helper={trainer ? 'Only admins see this.' : 'Only the programme team sees this.'}
+                />
+              </div>
+              <TextField
+                label="Email"
+                value={email}
+                disabled
+                helper={
+                  trainer
+                    ? `Set by ${me?.organisation?.name ?? 'your organisation'}.`
+                    : 'Use this email in Zoom so your attendance counts. Ask your programme team to change it.'
+                }
+              />
+              {trainer && (
+                <TextAreaField
+                  label="Short bio"
+                  optional
+                  value={bio}
+                  maxLength={300}
+                  onChange={(e) => set(setBio, 'bio')(e.target.value)}
+                  error={errors.bio}
+                  helper="Shown to participants on your sessions."
+                />
+              )}
+            </Panel>
 
-        <Panel aria-labelledby="password-title" className="gap-4">
-          <PanelHeader id="password-title" title="Password" description="At least 10 characters. Leave these empty to keep your password." />
-          <TextField
-            label="Current password"
-            type="password"
-            autoComplete="current-password"
-            value={current}
-            onChange={(e) => set(setCurrent, 'current')(e.target.value)}
-            error={errors.current}
-          />
-          <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
-            <TextField
-              label="New password"
-              type="password"
-              autoComplete="new-password"
-              placeholder="Enter a new password"
-              value={next}
-              onChange={(e) => set(setNext, 'next')(e.target.value)}
-              error={errors.next}
-            />
-            <TextField
-              label="Confirm"
-              type="password"
-              autoComplete="new-password"
-              placeholder="Repeat it"
-              value={confirm}
-              onChange={(e) => set(setConfirm, 'confirm')(e.target.value)}
-              error={errors.confirm}
-            />
-          </div>
-        </Panel>
+            <Panel aria-labelledby="password-title" className="gap-4">
+              <PanelHeader id="password-title" title="Password" description="At least 10 characters. Leave these empty to keep your password." />
+              <TextField
+                label="Current password"
+                type="password"
+                autoComplete="current-password"
+                value={current}
+                onChange={(e) => set(setCurrent, 'current')(e.target.value)}
+                error={errors.current}
+              />
+              <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
+                <TextField
+                  label="New password"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Enter a new password"
+                  value={next}
+                  onChange={(e) => set(setNext, 'next')(e.target.value)}
+                  error={errors.next}
+                />
+                <TextField
+                  label="Confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Repeat it"
+                  value={confirm}
+                  onChange={(e) => set(setConfirm, 'confirm')(e.target.value)}
+                  error={errors.confirm}
+                />
+              </div>
+            </Panel>
+          </>
+        )}
 
-        <PushPanel />
+        {section === 'settings' && (
+          <>
+            <PushPanel />
 
-        <Panel aria-labelledby="notifications-title" className="gap-2">
-          <PanelHeader id="notifications-title" title="Notifications" description="Choose how you hear about each event." />
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-default text-caption text-secondary">
-                <th scope="col" className="py-2 text-left font-normal">
-                  Event
-                </th>
-                <th scope="col" className="w-16 py-2 text-center font-normal">
-                  Email
-                </th>
-                <th scope="col" className="w-16 py-2 text-center font-normal">
-                  In-app
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {prefs.map((p, i) => (
-                <tr key={p.event} className="border-b border-default last:border-b-0">
-                  <td className="py-3">
-                    <span className="block text-body-strong text-primary">{p.label}</span>
-                    <span className="block text-caption text-secondary">{p.when}</span>
-                  </td>
-                  <td className="py-3 text-center">
-                    <Checkbox
-                      label={<span className="sr-only">Email for {p.label}</span>}
-                      className="mx-auto"
-                      checked={p.email}
-                      onChange={(e) => setPrefs((prev) => prev.map((x, j) => (j === i ? { ...x, email: e.target.checked } : x)))}
-                    />
-                  </td>
-                  <td className="py-3 text-center">
-                    <Checkbox
-                      label={<span className="sr-only">In-app for {p.label}</span>}
-                      className="mx-auto"
-                      checked={p.inApp}
-                      onChange={(e) => setPrefs((prev) => prev.map((x, j) => (j === i ? { ...x, inApp: e.target.checked } : x)))}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Panel>
+            <Panel aria-labelledby="notifications-title" className="gap-2">
+              <PanelHeader id="notifications-title" title="Notifications" description="Choose how you hear about each event." />
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-default text-caption text-secondary">
+                    <th scope="col" className="py-2 text-left font-normal">
+                      Event
+                    </th>
+                    <th scope="col" className="w-16 py-2 text-center font-normal">
+                      Email
+                    </th>
+                    <th scope="col" className="w-16 py-2 text-center font-normal">
+                      In-app
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {prefs.map((p, i) => (
+                    <tr key={p.event} className="border-b border-default last:border-b-0">
+                      <td className="py-3">
+                        <span className="block text-body-strong text-primary">{p.label}</span>
+                        <span className="block text-caption text-secondary">{p.when}</span>
+                      </td>
+                      <td className="py-3 text-center">
+                        <Checkbox
+                          label={<span className="sr-only">Email for {p.label}</span>}
+                          className="mx-auto"
+                          checked={p.email}
+                          onChange={(e) => setPrefs((prev) => prev.map((x, j) => (j === i ? { ...x, email: e.target.checked } : x)))}
+                        />
+                      </td>
+                      <td className="py-3 text-center">
+                        <Checkbox
+                          label={<span className="sr-only">In-app for {p.label}</span>}
+                          className="mx-auto"
+                          checked={p.inApp}
+                          onChange={(e) => setPrefs((prev) => prev.map((x, j) => (j === i ? { ...x, inApp: e.target.checked } : x)))}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Panel>
+          </>
+        )}
 
         <div className="flex justify-end gap-3 max-md:flex-col-reverse max-md:[&>*]:h-11">
           <Button variant="secondary" onClick={discard} disabled={!changed || saving}>

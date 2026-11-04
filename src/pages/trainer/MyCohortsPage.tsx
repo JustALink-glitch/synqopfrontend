@@ -262,7 +262,7 @@ export function MyCohortLayout() {
           },
           { label: 'Sessions', to: `/trainer/cohorts/${cohort.id}/sessions` },
           {
-            label: 'Courses',
+            label: 'Courses & resources',
             to: `/trainer/cohorts/${cohort.id}/courses`,
             count: courses.length,
           },

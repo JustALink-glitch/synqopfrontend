@@ -5,6 +5,26 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /*
+ * The sidebar as an icon rail: always below 1280px, and on wider screens when someone collapses it
+ * (<html data-rail="on">, pilot feedback Nov 2026). `full:` is the opposite: a wide screen with the sidebar open.
+ */
+@custom-variant rail {
+  @media (max-width: 1279px) {
+    @slot;
+  }
+  &:where([data-rail='on'] *) {
+    @slot;
+  }
+}
+@custom-variant full {
+  @media (min-width: 1280px) {
+    &:where(:root:not([data-rail='on']) *) {
+      @slot;
+    }
+  }
+}
+
+/*
  * Synqop design tokens — Development Reference V1 §09, one-to-one with Figma variables.
  * Semantic CSS variables switch per theme; Tailwind utilities read them via @theme inline,
  * e.g. bg-canvas, bg-surface, text-primary, border-default, bg-status-success-bg.
@@ -124,6 +144,12 @@
   --chart-grid: #242e3c;
   --overlay-scrim: rgb(0 0 0 / 0.6);
   color-scheme: dark;
+}
+
+@media (min-width: 1280px) {
+  :root[data-rail='on'] {
+    --sidebar-width: 72px;
+  }
 }
 
 @media (max-width: 1279px) {

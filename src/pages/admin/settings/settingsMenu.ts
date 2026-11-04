@@ -11,6 +11,7 @@ import {
   UserGroupIcon,
   UserIcon,
 } from '@/components/ui/icons'
+import { History } from 'lucide-react'
 import type { NavIcon } from '@/app/navigation'
 
 type Item = { label: string; path: string; icon: NavIcon; screen: string; summary: string }
@@ -23,6 +24,7 @@ export const settingsMenu: { group: string; items: Item[] }[] = [
       { label: 'Organisation details', path: 'organisation', icon: HomeIcon, screen: 'F1.01', summary: 'Name, type, country, time zone' },
       { label: 'Members & roles', path: 'members', icon: UserGroupIcon, screen: 'F1.02', summary: 'Staff, roles and invitations' },
       { label: 'Plan & billing', path: 'billing', icon: FileIcon, screen: 'F1.03', summary: 'Free plan' },
+      { label: 'Activity log', path: 'activity', icon: History as NavIcon, screen: 'F1.12', summary: 'Everything admins and trainers have done' },
       { label: 'Data & privacy', path: 'privacy', icon: LockIcon, screen: 'F1.10', summary: 'Export data or delete the organisation' },
     ],
   },

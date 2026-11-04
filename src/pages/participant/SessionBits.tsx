@@ -1,6 +1,6 @@
 import { ChevronRightIcon } from '@/components/ui/icons'
 import { Badge } from '@/components/ui/Page'
-import { downloadFile, fileKind, fileSize } from '@/lib/files'
+import { openFile, fileKind, fileSize } from '@/lib/files'
 import type { MyResource, MySession } from './data'
 
 const markTone = { present: 'success', absent: 'warning', excused: 'info' } as const
@@ -36,7 +36,7 @@ export function ResourceRow({ resource: r }: { resource: MyResource }) {
       {body}
     </a>
   ) : (
-    <button type="button" className={cls} onClick={() => void downloadFile(`/v1/my/resources/${r.id}`)}>
+    <button type="button" className={cls} onClick={() => void openFile(`/v1/my/resources/${r.id}`, r.name, r.type)}>
       {body}
     </button>
   )

@@ -10,7 +10,7 @@ import { ArrowRightIcon, CheckCircleIcon, ChevronLeftIcon } from '@/components/u
 import { PageHeader, Panel, PanelHeader } from '@/components/ui/Page'
 import { TextAreaField, TextField } from '@/components/ui/TextField'
 import { ApiError } from '@/lib/api'
-import { downloadFile } from '@/lib/files'
+import { openFile } from '@/lib/files'
 import { StatusBadge } from './AssignmentPage'
 import { formatDue, LETTERS, scaleHint, submittedLine, useSaveGrade, useSubmission, type GradeInput, type Letter, type SubmissionView } from './data'
 import { assignmentBase, type Area } from './paths'
@@ -117,7 +117,7 @@ function SubmissionView({ area, crumbs, data }: { area: Area; crumbs: { label: s
           {s ? (
             <>
               {s.files.map((f) => (
-                <FileRow key={f.id} name={f.name} size={f.size} onDownload={() => downloadFile(`/v1/assignments/${a.id}/files/${f.id}`)} />
+                <FileRow key={f.id} name={f.name} size={f.size} onDownload={() => openFile(`/v1/assignments/${a.id}/files/${f.id}`, f.name)} />
               ))}
               {s.link && (
                 <a

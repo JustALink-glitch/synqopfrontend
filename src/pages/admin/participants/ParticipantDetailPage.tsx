@@ -114,7 +114,7 @@ function ParticipantView({ data }: { data: ParticipantDetail }) {
     <>
       <PageHeader
         breadcrumb={[{ label: 'Participants', to: '/admin/participants' }, { label: name }]}
-        leading={<Avatar size={40} initials={initials(name)} seed={person.id} />}
+        leading={<Avatar size={40} initials={initials(name)} seed={person.id} enlarge={name} />}
         title={name}
         badge={
           <>

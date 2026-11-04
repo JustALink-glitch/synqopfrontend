@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { PALETTE } from './palette'
 
 /* Small, dependency-free charts (§10 Data visualisation): one look across the overview and reports. */
@@ -27,8 +27,26 @@ export function Legend({ items }: { items: { name: string; colour: string }[] })
 function niceMax(n: number) {
   if (n <= 0) return 1
   const p = 10 ** Math.floor(Math.log10(n))
-  return [1, 2, 2.5, 5, 10].map((m) => m * p).find((m) => m >= n)!
+  // Steps that halve to whole numbers, so the middle grid line never reads "13".
+  return [1, 2, 4, 5, 10].map((m) => m * p).find((m) => m >= n)!
 }
+
+/** The element's width, kept up to date; 0 until it's measured. */
+function useWidth<T extends HTMLElement>() {
+  const ref = useRef<T>(null)
+  const [width, setWidth] = useState(0)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(([e]) => setWidth(e!.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return [ref, width] as const
+}
+
+/** Rough width of a chart label at 11px, so labels can be thinned before they touch. */
+const labelWidth = (text: string) => text.length * 6.2 + 8
 
 /**
  * Vertical bars, stacked or side by side, with a light grid and labels thinned to fit.
@@ -56,7 +74,20 @@ export function BarChart({
   const coloured = series.map((s, i) => ({ ...s, colour: s.colour ?? PALETTE[i % PALETTE.length]! }))
   const totals = labels.map((_, i) => (stacked ? coloured.reduce((n, s) => n + (s.values[i] ?? 0), 0) : Math.max(0, ...coloured.map((s) => s.values[i] ?? 0))))
   const ceiling = max ?? niceMax(Math.max(...totals, 0))
-  const every = Math.ceil(labels.length / (labels.length > 16 ? 5 : 8))
+  const [ref, width] = useWidth<HTMLDivElement>()
+  const minWidth = labels.length > 40 ? labels.length * 7 : 0
+  const n = Math.max(labels.length, 1)
+  const full = Math.max(width, minWidth) - 16
+  // Each column's own width, after the gaps between columns (6% each, or 1px when there are many).
+  const slot = labels.length > 16 ? (full - (n - 1)) / n : (full * (1 - 0.06 * (n - 1))) / n
+  // Distance between the centres of two neighbouring labels.
+  const pitch = labels.length > 16 ? slot + 1 : slot + full * 0.06
+  // Show every nth label so none touch (pilot feedback, Nov 2026: weekly dates ran together in the narrow column).
+  const widest = Math.max(...labels.map(labelWidth), 1)
+  const every = width ? Math.max(1, Math.ceil(widest / pitch)) : Math.ceil(labels.length / (labels.length > 16 ? 5 : 8))
+  // Labels over the bars only when every one fits; otherwise they're in each bar's description.
+  const tops = top ? labels.map((_, i) => top(i)) : []
+  const showTops = Boolean(width) && tops.some(Boolean) && Math.max(...tops.map((t) => (t ? labelWidth(t) : 0))) <= pitch - 4
   const ticks = [0, 0.5, 1].map((f) => Math.round(ceiling * f))
   const plot = height - 18
   return (
@@ -71,8 +102,8 @@ export function BarChart({
             </span>
           ))}
         </div>
-        <div className="min-w-0 flex-1 overflow-x-auto">
-          <div className="relative" style={{ minWidth: labels.length > 40 ? labels.length * 7 : undefined }}>
+        <div ref={ref} className="min-w-0 flex-1 overflow-x-auto">
+          <div className="relative px-2" style={{ minWidth: minWidth || undefined }}>
             <div className="pointer-events-none absolute inset-x-0 top-0" style={{ height: plot }} aria-hidden="true">
               {ticks.map((t) => (
                 <span key={t} className="absolute inset-x-0 border-t border-chart-grid" style={{ top: plot - (t / ceiling) * plot }} />
@@ -85,7 +116,7 @@ export function BarChart({
                   className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-0.5"
                   aria-label={describe ? describe(i) : `${label}: ${coloured.map((s) => `${s.name} ${s.values[i] ?? 0}${unit}`).join(', ')}`}
                 >
-                  {top?.(i) && <span className="text-chart-label whitespace-nowrap text-secondary tabular-nums">{top(i)}</span>}
+                  {showTops && tops[i] && <span className="text-chart-label whitespace-nowrap text-secondary tabular-nums">{tops[i]}</span>}
                   {stacked ? (
                     <span className="flex w-full max-w-6 flex-col-reverse overflow-hidden rounded-t-xs" style={{ height: `${(totals[i]! / ceiling) * 100}%` }}>
                       {coloured.map((s) => (
@@ -108,8 +139,15 @@ export function BarChart({
             </ol>
             <div className={clsx('flex pt-1 text-chart-label text-secondary', labels.length > 16 ? 'gap-px' : 'gap-[6%]')} aria-hidden="true">
               {labels.map((label, i) => (
-                <span key={`${label}-${i}`} className="min-w-0 flex-1 text-center whitespace-nowrap">
-                  {i % every === 0 ? label : ''}
+                <span
+                  key={`${label}-${i}`}
+                  // The end labels hug the edges so they're never cut off by the scroll area.
+                  className={clsx(
+                    'flex min-w-0 flex-1 whitespace-nowrap',
+                    i === labels.length - 1 && labels.length > 1 ? 'justify-end' : i === 0 ? 'justify-start' : 'justify-center',
+                  )}
+                >
+                  {(labels.length - 1 - i) % every === 0 ? label : ''}
                 </span>
               ))}
             </div>

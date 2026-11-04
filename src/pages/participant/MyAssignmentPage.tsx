@@ -10,7 +10,7 @@ import { ChevronRightIcon, CloseIcon, DownloadIcon } from '@/components/ui/icons
 import { FilterChips, PageHeader, Panel, PanelHeader } from '@/components/ui/Page'
 import { TextAreaField, TextField } from '@/components/ui/TextField'
 import { ApiError } from '@/lib/api'
-import { downloadFile, fileSize, MAX_FILE_BYTES, uploadFile } from '@/lib/files'
+import { openFile, fileSize, MAX_FILE_BYTES, uploadFile } from '@/lib/files'
 import { formatDue, type SubmissionType } from '@/pages/assignments/data'
 import { gradingWords, submitWays, useMyAssignment, useSubmit, type MyAssignmentDetail, type MySubmission } from './data'
 import { MyStatusBadge } from './MyAssignmentsPage'
@@ -92,7 +92,7 @@ function MyAssignmentView({ timeZone, assignment: a, submission: s }: { timeZone
               <PanelHeader id="brief-title" title="Brief" />
               {a.brief && <p className="text-body whitespace-pre-line text-primary">{a.brief}</p>}
               {a.files.map((f) => (
-                <FileRow key={f.id} name={f.name} size={f.size} onDownload={() => downloadFile(`/v1/my/assignments/${a.id}/files/${f.id}`)} />
+                <FileRow key={f.id} name={f.name} size={f.size} onDownload={() => openFile(`/v1/my/assignments/${a.id}/files/${f.id}`, f.name)} />
               ))}
               {a.links.map((l) => (
                 <a
@@ -165,7 +165,7 @@ export function SubmissionContent({ assignmentId, submission: s }: { assignmentI
   return (
     <>
       {s.files.map((f) => (
-        <FileRow key={f.id} name={f.name} size={f.size} onDownload={() => downloadFile(`/v1/my/assignments/${assignmentId}/files/${f.id}`)} />
+        <FileRow key={f.id} name={f.name} size={f.size} onDownload={() => openFile(`/v1/my/assignments/${assignmentId}/files/${f.id}`, f.name)} />
       ))}
       {s.link && (
         <a href={s.link} target="_blank" rel="noreferrer" className="flex flex-col rounded-md border border-default p-3 hover:bg-surface-hover">

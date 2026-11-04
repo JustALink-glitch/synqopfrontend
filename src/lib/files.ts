@@ -1,5 +1,6 @@
 import { api } from './api'
 import { supabase } from './supabase'
+import { showFile, type ViewItem } from '@/components/files/FileViewer'
 
 /** Private bucket the API signs uploads and downloads for. */
 export const BUCKET = 'synqop-files'
@@ -71,4 +72,30 @@ export async function uploadFile(uploadsEndpoint: string, file: File): Promise<s
 export async function downloadFile(endpoint: string): Promise<void> {
   const { url } = await api<{ url: string }>(endpoint)
   window.location.assign(url)
+}
+
+/** What the in-app viewer can show; anything else (Word, Excel, zip…) downloads. SVG and HTML never open inline. */
+export function viewKind(name: string, type?: string | null): ViewItem['kind'] | null {
+  const t = (type ?? '').toLowerCase()
+  const ext = name.includes('.') ? name.split('.').pop()!.toLowerCase() : ''
+  if (/^image\/(png|jpe?g|gif|webp|avif)$/.test(t) || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif'].includes(ext)) return 'image'
+  if (/^video\/(mp4|webm|quicktime|ogg)$/.test(t) || ['mp4', 'webm', 'mov', 'm4v'].includes(ext)) return 'video'
+  if (/^audio\//.test(t) || ['mp3', 'm4a', 'wav', 'ogg', 'aac'].includes(ext)) return 'audio'
+  if (t === 'application/pdf' || t === 'text/plain' || ['pdf', 'txt'].includes(ext)) return 'document'
+  return null
+}
+
+/**
+ * Opens a stored file in the in-app viewer when it can be shown (pilot feedback, Nov 2026: resources went straight
+ * to download), or downloads it. `endpoint` answers { url }; with ?view=1 the link opens instead of saving.
+ */
+export async function openFile(endpoint: string, name: string, type?: string | null): Promise<void> {
+  const kind = viewKind(name, type)
+  if (!kind) return downloadFile(endpoint)
+  showFile({
+    name,
+    kind,
+    load: () => api<{ url: string }>(`${endpoint}${endpoint.includes('?') ? '&' : '?'}view=1`).then((r) => r.url),
+    download: () => downloadFile(endpoint),
+  })
 }

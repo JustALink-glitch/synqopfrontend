@@ -179,6 +179,7 @@ export interface MyResource {
   name: string
   url: string | null
   size: number | null
+  type?: string | null
 }
 
 export interface MyOverview {

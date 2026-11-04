@@ -349,7 +349,7 @@ function TrainerTable({ rows, selection, actions }: { rows: Member[]; selection:
             </td>
             <td>
               <div className="flex min-w-0 items-center gap-3">
-                <Avatar initials={initials(member.firstName, member.lastName)} seed={member.id} />
+                <Avatar initials={initials(member.firstName, member.lastName)} seed={member.id} enlarge={`${member.firstName} ${member.lastName}`} />
                 <div className="flex min-w-0 flex-col">
                   <Link
                     to={member.id}

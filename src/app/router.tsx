@@ -25,6 +25,7 @@ import { AdminOnlyPage, TodayPage } from '@/pages/trainer/TodayPage'
 import { SettingsIndex, SettingsLayout } from '@/pages/admin/settings/SettingsLayout'
 import { BillingPage } from '@/pages/admin/settings/BillingPage'
 import { PrivacyPage } from '@/pages/admin/settings/PrivacyPage'
+import { ActivityLogPage } from '@/pages/admin/settings/ActivityLogPage'
 import { MyCertificatePage, ProgressPage } from '@/pages/participant/ProgressPage'
 import { OverviewPage } from '@/pages/admin/overview/OverviewPage'
 import { ReportsPage } from '@/pages/admin/reports/ReportsPage'
@@ -88,6 +89,7 @@ const settingsPages: Record<string, () => React.JSX.Element> = {
   members: MembersSettingsPage,
   billing: BillingPage,
   privacy: PrivacyPage,
+  activity: ActivityLogPage,
   'programme-setup': ProgrammeSetupPage,
   completion: CompletionSettingsPage,
   'attention-rules': AttentionRulesPage,
@@ -160,6 +162,7 @@ const built: Partial<Record<Area, RouteObject[]>> = {
     { index: true, element: <TodayPage /> },
     { path: 'restricted', element: <AdminOnlyPage /> },
     { path: 'settings', element: <AccountSettingsPage area="trainer" /> },
+    { path: 'profile', element: <AccountSettingsPage area="trainer" section="profile" /> },
     { path: 'notifications', element: <NotificationsPage area="trainer" /> },
     { path: 'announcements', element: <AnnouncementsPage area="trainer" /> },
     { path: 'search', element: <SearchPage area="trainer" /> },
@@ -199,6 +202,7 @@ const built: Partial<Record<Area, RouteObject[]>> = {
     { path: 'sessions', element: <MySessionsPage /> },
     { path: 'sessions/:id', element: <MySessionPage /> },
     { path: 'settings', element: <SettingsPage /> },
+    { path: 'profile', element: <AccountSettingsPage area="participant" section="profile" /> },
     { path: 'notifications', element: <NotificationsPage area="participant" /> },
     { path: 'announcements', element: <AnnouncementsPage area="participant" /> },
     { path: 'search', element: <SearchPage area="participant" /> },

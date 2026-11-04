@@ -277,7 +277,7 @@ export function TrainerParticipantPage() {
     <>
       <PageHeader
         breadcrumb={[{ label: 'My participants', to: '/trainer/participants' }, { label: d.participant.name }]}
-        leading={<Avatar size={40} initials={initials(d.participant.name)} seed={d.participant.id} />}
+        leading={<Avatar size={40} initials={initials(d.participant.name)} seed={d.participant.id} enlarge={d.participant.name} />}
         title={d.participant.name}
         badge={flags.length ? <Badge tone="warning">Needs attention</Badge> : undefined}
         description={`Participant · ${d.cohort.name}${d.courses.length ? ` · in your course${d.courses.length > 1 ? 's' : ''}, ${d.courses.join(', ')}` : ''}`}

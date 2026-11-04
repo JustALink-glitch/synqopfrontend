@@ -181,7 +181,7 @@ function MembersTable({ members, onOpen, onResend }: { members: StaffMember[]; o
             <Row key={m.id}>
               <Cell>
                 <span className="flex min-w-0 items-center gap-2.5">
-                  <Avatar initials={initials(m.firstName, m.lastName)} seed={m.id} />
+                  <Avatar initials={initials(m.firstName, m.lastName)} seed={m.id} enlarge={`${m.firstName} ${m.lastName}`} />
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate text-body-strong text-primary">{fullNameOf(m)}</span>
                     {m.status === 'invited' && <span className="truncate text-caption text-secondary">{m.email}</span>}
@@ -199,7 +199,7 @@ function MembersTable({ members, onOpen, onResend }: { members: StaffMember[]; o
       <ul className="flex flex-col md:hidden">
         {sorted.map((m) => (
           <li key={m.id} className="flex items-center gap-3 border-b border-default py-3 last:border-b-0">
-            <Avatar size={32} initials={initials(m.firstName, m.lastName)} seed={m.id} />
+            <Avatar size={32} initials={initials(m.firstName, m.lastName)} seed={m.id} enlarge={`${m.firstName} ${m.lastName}`} />
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="truncate text-body-strong text-primary">{fullNameOf(m)}</span>
               <span className="flex flex-wrap items-center gap-2 text-caption text-secondary">

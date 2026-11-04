@@ -1,11 +1,13 @@
+import { Eye } from 'lucide-react'
 import clsx from 'clsx'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertBanner } from '@/components/ui/AlertBanner'
-import { ChevronRightIcon, DownloadIcon } from '@/components/ui/icons'
+import { ChevronRightIcon, DownloadIcon, PlusIcon } from '@/components/ui/icons'
+import { Button } from '@/components/ui/Button'
 import { Badge, Panel, PanelHeader } from '@/components/ui/Page'
 import { api } from '@/lib/api'
-import { downloadFile, fileKind, fileSize } from '@/lib/files'
+import { openFile, fileKind, fileSize, viewKind } from '@/lib/files'
 import { ResourceDialog, type NewResource } from '@/pages/admin/sessions/ResourcesPanel'
 
 interface CourseResource {
@@ -50,7 +52,7 @@ export function CourseResourcesPanel({ cohortCourseId, courseName, cohortName }:
   async function open(r: CourseResource) {
     try {
       if (r.kind === 'link' && r.url) window.open(r.url, '_blank', 'noopener')
-      else await downloadFile(`/v1/cohort-courses/${cohortCourseId}/resources/${r.id}`)
+      else await openFile(`/v1/cohort-courses/${cohortCourseId}/resources/${r.id}`, r.name, r.type)
     } catch {
       setNotice({ tone: 'error', title: `Couldn’t open ${r.name}. Try again.` })
     }
@@ -59,16 +61,14 @@ export function CourseResourcesPanel({ cohortCourseId, courseName, cohortName }:
   return (
     <Panel className="gap-0">
       <div className="flex items-start justify-between gap-3">
-        <PanelHeader title={`${courseName} resources`} description="For the whole course. Every session shows them to participants." />
+        <PanelHeader
+          title={`${courseName} resources`}
+          description="Files and links for the whole course, not tied to one session. Participants see them on the course and every session."
+        />
         {canAdd && (
-          <button
-            type="button"
-            onClick={() => (setNotice(null), setAdding(true))}
-            className="inline-flex h-7 shrink-0 items-center gap-1 text-caption-strong text-brand-text hover:underline"
-          >
+          <Button variant="secondary" icon={<PlusIcon size={16} />} onClick={() => (setNotice(null), setAdding(true))}>
             Add resource
-            <ChevronRightIcon size={14} />
-          </button>
+          </Button>
         )}
       </div>
       {notice && (
@@ -109,7 +109,11 @@ export function CourseResourcesPanel({ cohortCourseId, courseName, cohortName }:
                   </span>
                 </span>
                 {r.kind === 'file' ? (
-                  <DownloadIcon size={16} className="shrink-0 text-icon-muted" />
+                  viewKind(r.name, r.type) ? (
+                    <Eye className="size-4 shrink-0 text-icon-muted" aria-hidden />
+                  ) : (
+                    <DownloadIcon size={16} className="shrink-0 text-icon-muted" />
+                  )
                 ) : (
                   <ChevronRightIcon size={16} className="shrink-0 text-icon-muted" />
                 )}

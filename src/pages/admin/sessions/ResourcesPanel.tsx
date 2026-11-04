@@ -1,3 +1,4 @@
+import { Eye } from 'lucide-react'
 import clsx from 'clsx'
 import { useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { useAuth } from '@/auth/useAuth'
@@ -9,7 +10,7 @@ import { ChevronRightIcon, DownloadIcon } from '@/components/ui/icons'
 import { Panel, PanelHeader } from '@/components/ui/Page'
 import { SelectField, TextField } from '@/components/ui/TextField'
 import { ApiError } from '@/lib/api'
-import { downloadFile, fileKind, fileSize, uploadFile } from '@/lib/files'
+import { openFile, fileKind, fileSize, uploadFile, viewKind } from '@/lib/files'
 import { formatDay } from '@/lib/format'
 import { useAddResource, type SessionDetail, type SessionResource } from './data'
 
@@ -77,7 +78,7 @@ function ResourceItem({ sessionId, resource: r }: { sessionId: string; resource:
     setFailed(false)
     try {
       if (r.kind === 'link' && r.url) window.open(r.url, '_blank', 'noopener')
-      else await downloadFile(`/v1/sessions/${sessionId}/resources/${r.id}`)
+      else await openFile(`/v1/sessions/${sessionId}/resources/${r.id}`, r.name, r.type)
     } catch {
       setFailed(true)
     }
@@ -96,7 +97,11 @@ function ResourceItem({ sessionId, resource: r }: { sessionId: string; resource:
           </span>
         </span>
         {r.kind === 'file' ? (
-          <DownloadIcon size={16} className="shrink-0 text-icon-muted" />
+          viewKind(r.name, r.type) ? (
+            <Eye className="size-4 shrink-0 text-icon-muted" aria-hidden />
+          ) : (
+            <DownloadIcon size={16} className="shrink-0 text-icon-muted" />
+          )
         ) : (
           <ChevronRightIcon size={16} className="shrink-0 text-icon-muted" />
         )}

@@ -1,5 +1,6 @@
 import clsx from 'clsx'
 import { useState } from 'react'
+import { showFile } from '@/components/files/FileViewer'
 import { usePhoto } from '@/lib/photos'
 
 const tones = [
@@ -29,16 +30,34 @@ export function Avatar({
   size = 24,
   src,
   className,
+  enlarge,
 }: {
   initials: string
   seed?: string
   size?: 24 | 32 | 40
   src?: string | null
   className?: string
+  /** The person's name: tapping the photo opens it full screen (pilot feedback, Nov 2026). */
+  enlarge?: string
 }) {
   const looked = usePhoto(seed, src !== undefined)
   const photo = src ?? looked
   const [broken, setBroken] = useState<string | null>(null)
+  if (photo && broken !== photo && enlarge)
+    return (
+      <button
+        type="button"
+        aria-label={`View ${enlarge}’s photo`}
+        onClick={(e) => {
+          // Inside a clickable table row: open the photo, not the row.
+          e.stopPropagation()
+          showFile({ name: enlarge, kind: 'image', url: photo })
+        }}
+        className="shrink-0 cursor-zoom-in rounded-full focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none"
+      >
+        <img src={photo} alt="" onError={() => setBroken(photo)} className={clsx('rounded-full object-cover', sizes[size], className)} />
+      </button>
+    )
   if (photo && broken !== photo)
     return (
       <img

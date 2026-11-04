@@ -16,6 +16,7 @@ import { CohortStatusBadge } from './badges'
 import { ArchiveCohortDialog } from './CohortFormPage'
 import { useCohort, useRestoreCohort, type CohortCourse, type CohortSummary } from './data'
 import { deliveryLabel } from './labels'
+import { CourseResourcesPanel } from '@/components/resources/CourseResourcesPanel'
 import { CohortParticipantsList } from '@/pages/admin/participants/CohortParticipantsList'
 import { CohortSessionsList } from '@/pages/admin/sessions/CohortSessionsList'
 import { UpcomingSessions } from '@/pages/admin/sessions/UpcomingSessions'
@@ -107,7 +108,13 @@ export function CohortLayout() {
               </Button>
               {cohort.status !== 'completed' && (
                 <>
-                  <Button variant="secondary" icon={<DownloadIcon size={16} />} onClick={() => navigate(`/admin/participants/import?cohort=${cohort.id}`)}>
+                  {/* On phones the Participants tab has it; three header buttons pushed the page down a third of the screen. */}
+                  <Button
+                    variant="secondary"
+                    className="max-md:hidden"
+                    icon={<DownloadIcon size={16} />}
+                    onClick={() => navigate(`/admin/participants/import?cohort=${cohort.id}`)}
+                  >
                     Import participants
                   </Button>
                   <Button icon={<CalendarIcon size={16} />} onClick={() => navigate(`/admin/courses/sessions/new?cohort=${cohort.id}`)}>
@@ -136,7 +143,7 @@ export function CohortLayout() {
           { label: 'Overview', to: `/admin/cohorts/${cohort.id}`, end: true },
           { label: 'Participants', to: `/admin/cohorts/${cohort.id}/participants`, count: cohort.participants },
           { label: 'Sessions', to: `/admin/cohorts/${cohort.id}/sessions` },
-          { label: 'Courses', to: `/admin/cohorts/${cohort.id}/courses`, count: courses.length },
+          { label: 'Courses & resources', to: `/admin/cohorts/${cohort.id}/courses`, count: courses.length },
           { label: 'Trainers', to: `/admin/cohorts/${cohort.id}/trainers`, count: trainerCount },
         ]}
       />
@@ -230,7 +237,7 @@ export function CohortOverview() {
             ) : (
               <ul>
                 {courses.map((course) => {
-                  const pct = course.plannedSessions ? Math.round((course.heldSessions / course.plannedSessions) * 100) : null
+                  const pct = course.plannedSessions ? Math.min(100, Math.round((course.heldSessions / course.plannedSessions) * 100)) : null
                   return (
                     <li key={course.id} className="flex items-center gap-3 border-b border-default py-3 last:border-b-0">
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -347,42 +354,81 @@ export function CohortCourses() {
         {courses.length === 0 ? (
           <EmptyState icon={<BookOpenIcon size={24} />} title="No courses in this cohort" body="Tick courses from the programme’s library in Edit cohort." />
         ) : (
-          <Table columns={courseColumns}>
-            {courses.map((course) => {
-              const lead = course.trainers.find((t) => t.isLead)
-              const assistants = course.trainers.filter((t) => !t.isLead)
-              return (
-                <Row key={course.id}>
-                  <Cell>
-                    <Stacked primary={course.name} secondary={course.firstSessionAt ? `Starts ${formatDay(course.firstSessionAt)}` : 'No sessions yet'} />
-                  </Cell>
-                  <Cell>
-                    {lead ? (
-                      <Link to={`/admin/trainers/${lead.id}`} className="flex min-w-0 items-center gap-2 hover:underline">
-                        <Avatar initials={initials(lead.firstName, lead.lastName)} seed={lead.id} />
-                        <span className="truncate text-body-strong">
-                          {lead.firstName} {lead.lastName}
-                        </span>
-                      </Link>
-                    ) : (
-                      <span className="text-muted">Not assigned</span>
-                    )}
-                  </Cell>
-                  <Cell hideBelow="lg" className={assistants.length ? undefined : 'text-muted'}>
-                    {assistants.length ? assistants.map((a) => `${a.firstName} ${a.lastName}`).join(', ') : '—'}
-                  </Cell>
-                  <Cell align="right" className="text-body-strong">
-                    {course.plannedSessions ? `${course.heldSessions} of ${course.plannedSessions}` : course.heldSessions}
-                  </Cell>
-                  <Cell align="right" hideBelow="xl" className={course.assignments ? undefined : 'text-muted'}>
-                    {course.assignments || '—'}
-                  </Cell>
-                </Row>
-              )
-            })}
-          </Table>
+          <>
+            <ul className="md:hidden">
+              {courses.map((course) => {
+                const lead = course.trainers.find((t) => t.isLead)
+                const assistants = course.trainers.filter((t) => !t.isLead)
+                return (
+                  <li key={course.id} className="flex items-start gap-3 border-b border-default py-3 last:border-b-0">
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="text-body-strong text-primary">{course.name}</span>
+                      <span className="text-caption text-secondary">
+                        {[
+                          lead ? `Lead: ${lead.firstName} ${lead.lastName}` : 'No lead trainer',
+                          assistants.length ? `Assistant: ${assistants.map((a) => `${a.firstName} ${a.lastName}`).join(', ')}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                      <span className="text-caption text-secondary">
+                        {course.firstSessionAt ? `Starts ${formatDay(course.firstSessionAt)}` : 'No sessions yet'}
+                        {course.assignments ? ` · ${course.assignments} assignment${course.assignments === 1 ? '' : 's'}` : ''}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block text-body-strong text-primary tabular-nums">
+                        {course.plannedSessions ? `${course.heldSessions} of ${course.plannedSessions}` : course.heldSessions}
+                      </span>
+                      <span className="text-caption text-secondary">held</span>
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+            <div className="max-md:hidden">
+              <Table columns={courseColumns}>
+                {courses.map((course) => {
+                  const lead = course.trainers.find((t) => t.isLead)
+                  const assistants = course.trainers.filter((t) => !t.isLead)
+                  return (
+                    <Row key={course.id}>
+                      <Cell>
+                        <Stacked primary={course.name} secondary={course.firstSessionAt ? `Starts ${formatDay(course.firstSessionAt)}` : 'No sessions yet'} />
+                      </Cell>
+                      <Cell>
+                        {lead ? (
+                          <Link to={`/admin/trainers/${lead.id}`} className="flex min-w-0 items-center gap-2 hover:underline">
+                            <Avatar initials={initials(lead.firstName, lead.lastName)} seed={lead.id} />
+                            <span className="truncate text-body-strong">
+                              {lead.firstName} {lead.lastName}
+                            </span>
+                          </Link>
+                        ) : (
+                          <span className="text-muted">Not assigned</span>
+                        )}
+                      </Cell>
+                      <Cell hideBelow="lg" className={assistants.length ? undefined : 'text-muted'}>
+                        {assistants.length ? assistants.map((a) => `${a.firstName} ${a.lastName}`).join(', ') : '—'}
+                      </Cell>
+                      <Cell align="right" className="text-body-strong">
+                        {course.plannedSessions ? `${course.heldSessions} of ${course.plannedSessions}` : course.heldSessions}
+                      </Cell>
+                      <Cell align="right" hideBelow="xl" className={course.assignments ? undefined : 'text-muted'}>
+                        {course.assignments || '—'}
+                      </Cell>
+                    </Row>
+                  )
+                })}
+              </Table>
+            </div>
+          </>
         )}
       </Panel>
+      {/* Files and links for one course in this cohort, without a session (pilot feedback, Nov 2026). */}
+      {courses.map((c) => (
+        <CourseResourcesPanel key={c.id} cohortCourseId={c.id} courseName={c.name} cohortName={cohort.name} />
+      ))}
     </>
   )
 }
@@ -409,26 +455,48 @@ export function CohortTrainers() {
           body="Give each course a default lead trainer and they join every cohort that runs it."
         />
       ) : (
-        <Table columns={trainerColumns}>
-          {trainers.map((t) => (
-            <Row key={t.id} to={`/admin/trainers/${t.id}`}>
-              <Cell>
-                <span className="flex min-w-0 items-center gap-3">
-                  <Avatar initials={initials(t.name)} seed={t.id} />
-                  <Stacked primary={t.name} secondary={t.status === 'invited' ? 'Invitation pending' : undefined} />
-                </span>
-              </Cell>
-              <Cell>{t.lead.length ? 'Lead' : 'Assistant'}</Cell>
-              <Cell hideBelow="lg">{[...t.lead, ...t.assistant].join(', ')}</Cell>
-              <Cell align="right" hideBelow="xl">
-                {trainerStats[t.id]?.held ?? 0}
-              </Cell>
-              <Cell align="right" hideBelow="xl">
-                {trainerStats[t.id]?.reports ?? 0}
-              </Cell>
-            </Row>
-          ))}
-        </Table>
+        <>
+          <ul className="md:hidden">
+            {trainers.map((t) => (
+              <li key={t.id} className="border-b border-default last:border-b-0">
+                <Link to={`/admin/trainers/${t.id}`} className="flex items-center gap-3 py-3">
+                  <Avatar initials={initials(t.name)} seed={t.id} size={32} />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate text-body-strong text-primary">{t.name}</span>
+                    <span className="truncate text-caption text-secondary">
+                      {[t.lead.length ? 'Lead' : 'Assistant', [...t.lead, ...t.assistant].join(', '), t.status === 'invited' ? 'Invitation pending' : null]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                  </span>
+                  <ChevronRightIcon size={16} className="shrink-0 text-icon-muted" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <div className="max-md:hidden">
+            <Table columns={trainerColumns}>
+              {trainers.map((t) => (
+                <Row key={t.id} to={`/admin/trainers/${t.id}`}>
+                  <Cell>
+                    <span className="flex min-w-0 items-center gap-3">
+                      <Avatar initials={initials(t.name)} seed={t.id} />
+                      <Stacked primary={t.name} secondary={t.status === 'invited' ? 'Invitation pending' : undefined} />
+                    </span>
+                  </Cell>
+                  <Cell>{t.lead.length ? 'Lead' : 'Assistant'}</Cell>
+                  <Cell hideBelow="lg">{[...t.lead, ...t.assistant].join(', ')}</Cell>
+                  <Cell align="right" hideBelow="xl">
+                    {trainerStats[t.id]?.held ?? 0}
+                  </Cell>
+                  <Cell align="right" hideBelow="xl">
+                    {trainerStats[t.id]?.reports ?? 0}
+                  </Cell>
+                </Row>
+              ))}
+            </Table>
+          </div>
+        </>
       )}
     </Panel>
   )

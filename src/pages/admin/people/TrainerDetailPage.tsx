@@ -1,3 +1,5 @@
+import { initials } from '@/lib/people'
+import { Avatar } from '@/components/ui/Avatar'
 import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
@@ -138,6 +140,7 @@ function TrainerDetail({
       <PageHeader
         breadcrumb={[{ label: 'Trainers', to: '/admin/trainers' }, { label: name }]}
         title={name}
+        leading={<Avatar size={40} initials={initials(member.firstName, member.lastName)} seed={member.id} enlarge={name} />}
         badge={member.status === 'active' ? undefined : <StatusBadge member={member} />}
         description={meta}
         actions={
