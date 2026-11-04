@@ -322,3 +322,16 @@
     font-size: 16px;
   }
 }
+
+/* The bulk-actions toolbar rises into place. */
+@keyframes bulkbar-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
+/* Room under a list while the bulk-actions toolbar is showing, so it never covers the last rows. */
+:root[data-bulkbar='on'] main {
+  padding-bottom: 96px;
+}

@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { Check, CheckCheck, Megaphone } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useLocation } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { StatePanel } from '@/components/StatePanel'
@@ -10,10 +10,11 @@ import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Choice'
 import { Dialog } from '@/components/ui/Dialog'
 import { Menu } from '@/components/ui/Menu'
-import { Badge, EmptyState, PageHeader, Panel } from '@/components/ui/Page'
+import { EmptyState, PageHeader, Panel } from '@/components/ui/Page'
+import { TabButtons } from '@/components/ui/Tabs'
 import { SelectField, TextAreaField, TextField } from '@/components/ui/TextField'
 import { ApiError } from '@/lib/api'
-import { formatTime, plural, relativeDay } from '@/lib/format'
+import { formatTime, plural, relativeDay, timeAgo } from '@/lib/format'
 import { initials } from '@/lib/people'
 import type { Area } from '@/lib/roles'
 import {
@@ -23,6 +24,8 @@ import {
   useEditAnnouncement,
   useMarkRead,
   usePostAnnouncement,
+  useRecordSeen,
+  useViewers,
   type Announcement,
   type Audience,
   type AnnouncementsView,
@@ -63,8 +66,12 @@ export function AnnouncementsPage({ area }: { area: Area }) {
   const [composing, setComposing] = useState(false)
   const [editing, setEditing] = useState<Announcement | null>(null)
   const [deleting, setDeleting] = useState<Announcement | null>(null)
+  const [viewers, setViewers] = useState<Announcement | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const mark = useMarkRead()
+  // Count a view once a card is actually on screen (not your own posts).
+  const me = state.status === 'signed-in' ? state.me.membership.id : undefined
+  useRecordSeen((query.data?.announcements ?? []).filter((a) => a.author?.id !== me).map((a) => a.id))
 
   // Opened from a notification: bring that announcement into view.
   useEffect(() => {
@@ -81,7 +88,12 @@ export function AnnouncementsPage({ area }: { area: Area }) {
         actions={
           <>
             {Boolean(view?.unread) && (
-              <Button variant="secondary" icon={<CheckCheck aria-hidden className="size-4" />} disabled={mark.isPending} onClick={() => mark.mutate({ id: 'all', read: true })}>
+              <Button
+                variant="secondary"
+                icon={<CheckCheck aria-hidden className="size-4" />}
+                disabled={mark.isPending}
+                onClick={() => mark.mutate({ id: 'all', read: true })}
+              >
                 Mark all as read
               </Button>
             )}
@@ -119,58 +131,19 @@ export function AnnouncementsPage({ area }: { area: Area }) {
           />
         </Panel>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col gap-4">
           {view!.announcements.map((a) => (
-            <li key={a.id} id={`a-${a.id}`}>
-              <Panel
-                aria-label={a.read ? a.title : `New: ${a.title}`}
-                className={clsx('gap-3 scroll-mt-24', !a.read && 'border-l-4 border-l-[var(--color-brand)]', hash === `#${a.id}` && 'ring-2 ring-[var(--color-brand)]')}
-              >
-                <div className="flex items-start gap-3">
-                  <Avatar size={40} seed={a.author?.id} initials={initials(...(a.author?.name.split(' ') ?? ['?']))} />
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="truncate text-body-strong text-primary">{a.author?.name ?? 'Former member'}</span>
-                    <span className="text-caption text-secondary">
-                      {[
-                        a.author && roleLabel[a.author.role],
-                        `${relativeDay(a.createdAt, timeZone)}, ${formatTime(a.createdAt, timeZone)}`,
-                        a.edited && 'edited',
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </span>
-                  </div>
-                  <Menu
-                    label="More"
-                    variant="link"
-                    accessibleLabel={`More for ${a.title}`}
-                    items={[
-                      a.read ? { label: 'Mark as unread', onSelect: () => mark.mutate({ id: a.id, read: false }) } : { label: 'Mark as read', onSelect: () => mark.mutate({ id: a.id, read: true }) },
-                      ...(a.can.edit
-                        ? [
-                            { label: 'Edit', onSelect: () => setEditing(a) },
-                            { label: 'Delete', destructive: true, onSelect: () => setDeleting(a) },
-                          ]
-                        : []),
-                    ]}
-                  />
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {!a.read && <Badge tone="info">New</Badge>}
-                  <Badge tone="neutral">{audienceLabel(a)}</Badge>
-                  {a.important && <Badge tone="warning">Important</Badge>}
-                </div>
-                <h2 className="text-heading-section text-primary">{a.title}</h2>
-                <p className="text-body whitespace-pre-line text-primary">{a.body}</p>
-                {!a.read && (
-                  <div>
-                    <Button variant="secondary" icon={<Check aria-hidden className="size-4" />} disabled={mark.isPending} onClick={() => mark.mutate({ id: a.id, read: true })}>
-                      Mark as read
-                    </Button>
-                  </div>
-                )}
-              </Panel>
-            </li>
+            <AnnouncementCard
+              key={a.id}
+              a={a}
+              timeZone={timeZone}
+              highlighted={hash === `#${a.id}`}
+              busy={mark.isPending}
+              onRead={(read) => mark.mutate({ id: a.id, read })}
+              onEdit={() => setEditing(a)}
+              onDelete={() => setDeleting(a)}
+              onViewers={() => setViewers(a)}
+            />
           ))}
         </ul>
       )}
@@ -184,6 +157,7 @@ export function AnnouncementsPage({ area }: { area: Area }) {
           }}
         />
       )}
+      {viewers && <ViewersDialog announcement={viewers} timeZone={timeZone} onClose={() => setViewers(null)} />}
       {editing && <EditDialog announcement={editing} onClose={() => setEditing(null)} />}
       {deleting && (
         <DeleteDialog
@@ -196,6 +170,209 @@ export function AnnouncementsPage({ area }: { area: Area }) {
         />
       )}
     </>
+  )
+}
+
+const LONG = 420
+
+/**
+ * One announcement as a post (pilot feedback, Nov 2026): the title leads, then who posted it and when, the audience as
+ * a tag, and the message. The author and admins see who has seen it, bottom right.
+ */
+function AnnouncementCard({
+  a,
+  timeZone,
+  highlighted,
+  busy,
+  onRead,
+  onEdit,
+  onDelete,
+  onViewers,
+}: {
+  a: Announcement
+  timeZone?: string
+  highlighted: boolean
+  busy: boolean
+  onRead: (read: boolean) => void
+  onEdit: () => void
+  onDelete: () => void
+  onViewers: () => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const long = a.body.length > LONG || a.body.split('\n').length > 6
+  const seen = a.seenBy
+  return (
+    <li id={`a-${a.id}`} data-seen-id={a.id} className="scroll-mt-24">
+      <article
+        aria-label={a.read ? a.title : `New: ${a.title}`}
+        className={clsx(
+          'flex flex-col gap-4 rounded-2xl border bg-surface p-6 max-md:gap-3 max-md:p-4',
+          highlighted ? 'border-brand ring-2 ring-[var(--color-brand)]' : 'border-default',
+        )}
+      >
+        <div className="flex items-start gap-3">
+          <h2 className="min-w-0 flex-1 text-[22px] leading-7 font-bold tracking-[-0.01em] text-primary max-md:text-[19px] max-md:leading-6">
+            {!a.read && <span className="mr-2 inline-block size-2.5 -translate-y-[3px] rounded-full bg-brand" role="img" aria-label="New" />}
+            {a.title}
+          </h2>
+          <span className="-mt-1 -mr-2 shrink-0">
+            <Menu
+              label="More"
+              variant="icon"
+              accessibleLabel={`More for ${a.title}`}
+              items={[
+                a.read ? { label: 'Mark as unread', onSelect: () => onRead(false) } : { label: 'Mark as read', onSelect: () => onRead(true) },
+                ...(a.seenBy ? [{ label: 'Who has seen it', onSelect: onViewers }] : []),
+                ...(a.can.edit
+                  ? [
+                      { label: 'Edit', onSelect: onEdit },
+                      { label: 'Delete', destructive: true, onSelect: onDelete },
+                    ]
+                  : []),
+              ]}
+            />
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="flex min-w-0 flex-1 items-center gap-2.5">
+            <Avatar size={40} seed={a.author?.id} initials={initials(...(a.author?.name.split(' ') ?? ['?']))} />
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-body-strong text-primary">{a.author?.name ?? 'Former member'}</span>
+              <span className="truncate text-caption text-secondary" title={`${relativeDay(a.createdAt, timeZone)}, ${formatTime(a.createdAt, timeZone)}`}>
+                {[a.author && roleLabel[a.author.role], timeAgo(a.createdAt, timeZone), a.edited && 'edited'].filter(Boolean).join(' · ')}
+              </span>
+            </span>
+          </span>
+          <span className="flex flex-wrap gap-1.5">
+            {a.important && <Tag tone="warning">Important</Tag>}
+            <Tag tone="brand">{audienceLabel(a)}</Tag>
+          </span>
+        </div>
+
+        <div className="flex flex-col items-start gap-1">
+          <p className={clsx('text-body leading-6 whitespace-pre-line text-primary', long && !expanded && 'line-clamp-5')}>{a.body}</p>
+          {long && (
+            <button type="button" onClick={() => setExpanded((v) => !v)} className="text-body-strong text-brand-text hover:underline">
+              {expanded ? 'Show less' : 'Read more'}
+            </button>
+          )}
+        </div>
+
+        {(!a.read || seen) && (
+          <div className="flex flex-wrap items-center gap-3">
+            {!a.read && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onRead(true)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-surface-subtle px-3 text-caption-strong text-primary transition-colors hover:bg-surface-hover focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none disabled:text-disabled"
+              >
+                <Check aria-hidden className="size-3.5" />
+                Mark as read
+              </button>
+            )}
+            {seen && (
+              <button
+                type="button"
+                onClick={onViewers}
+                className="ml-auto inline-flex h-8 items-center gap-2 rounded-full pr-1 pl-3 text-caption-strong text-secondary transition-colors hover:bg-surface-subtle hover:text-primary focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none"
+              >
+                {seen.count ? `Seen by ${plural(seen.count, 'person', 'people')}` : 'Not seen yet'}
+                {seen.recent.length > 0 && (
+                  <span className="flex -space-x-2" aria-hidden>
+                    {seen.recent.map((p) => (
+                      <Avatar key={p.id} size={24} seed={p.id} initials={initials(...p.name.split(' '))} className="ring-2 ring-[var(--color-surface)]" />
+                    ))}
+                    {seen.count > seen.recent.length && (
+                      <span className="inline-flex size-6 items-center justify-center rounded-full bg-neutral-bg text-[10px] font-semibold text-neutral-fg ring-2 ring-[var(--color-surface)]">
+                        +{seen.count - seen.recent.length}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+        )}
+      </article>
+    </li>
+  )
+}
+
+function Tag({ tone, children }: { tone: 'brand' | 'warning'; children: ReactNode }) {
+  return (
+    <span
+      className={clsx(
+        'inline-flex h-6 max-w-[220px] items-center truncate rounded-md px-2.5 text-caption-strong',
+        tone === 'brand' ? 'bg-brand-subtle text-brand-text' : 'bg-warning-bg text-warning-fg',
+      )}
+    >
+      {children}
+    </span>
+  )
+}
+
+/** Who has and hasn't seen an announcement, for its author and admins. Loaded only when opened. */
+function ViewersDialog({ announcement: a, timeZone, onClose }: { announcement: Announcement; timeZone?: string; onClose: () => void }) {
+  const query = useViewers(a.id)
+  const [tab, setTab] = useState<'seen' | 'notSeen'>('seen')
+  const list = query.data?.[tab] ?? []
+  const total = query.data ? query.data.seen.length + query.data.notSeen.length : 0
+  return (
+    <Dialog
+      open
+      width={440}
+      onClose={onClose}
+      title="Who has seen it"
+      description={query.data ? `“${a.title}” · sent to ${plural(total, 'person', 'people')}, ${query.data.seen.length} seen it so far.` : `“${a.title}”`}
+      actions={
+        <Button variant="secondary" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      {query.isPending ? (
+        <div aria-busy="true" className="h-40">
+          <span className="sr-only">Loading</span>
+        </div>
+      ) : query.isError ? (
+        <StatePanel
+          kind="error"
+          title="Couldn’t load this"
+          description="Check your connection and try again."
+          action={{ label: 'Try again', onClick: () => void query.refetch() }}
+        />
+      ) : (
+        <div className="flex flex-col gap-3">
+          <TabButtons
+            label="Seen or not"
+            value={tab}
+            onChange={setTab}
+            items={[
+              { value: 'seen' as const, label: `Seen (${query.data.seen.length})` },
+              { value: 'notSeen' as const, label: `Not yet (${query.data.notSeen.length})` },
+            ]}
+          />
+          {list.length === 0 ? (
+            <p className="py-6 text-center text-body text-secondary">{tab === 'seen' ? 'Nobody has seen it yet.' : 'Everyone it was sent to has seen it.'}</p>
+          ) : (
+            <ul className="-mx-1 flex max-h-[50dvh] flex-col overflow-y-auto px-1">
+              {list.map((p) => (
+                <li key={p.id} className="flex items-center gap-3 border-b border-default py-2.5 last:border-b-0">
+                  <Avatar size={32} seed={p.id} initials={initials(...p.name.split(' '))} />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-body-strong text-primary">{p.name}</span>
+                    <span className="truncate text-caption text-secondary">{roleLabel[p.role] ?? p.role}</span>
+                  </span>
+                  {'at' in p && <span className="shrink-0 text-caption text-secondary">{timeAgo(p.at as string, timeZone)}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </Dialog>
   )
 }
 

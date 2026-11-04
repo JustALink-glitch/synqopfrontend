@@ -116,3 +116,12 @@ export function weekdayList(days: number[], options: { plural?: boolean } = {}):
   if (names.length <= 1) return names.join('')
   return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
 }
+
+/** "Just now", "12m ago", "6h ago", then the day ("Yesterday", "Mon 3 Nov") — for feeds such as announcements. */
+export function timeAgo(value: string | Date, timeZone?: string, now = Date.now()): string {
+  const minutes = Math.floor((now - new Date(value).getTime()) / 60_000)
+  if (minutes < 1) return 'Just now'
+  if (minutes < 60) return `${minutes}m ago`
+  if (minutes < 60 * 12) return `${Math.floor(minutes / 60)}h ago`
+  return `${relativeDay(value, timeZone)}, ${formatTime(value, timeZone)}`
+}

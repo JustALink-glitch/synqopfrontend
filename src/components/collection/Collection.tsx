@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { LayoutGrid, List, X } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AlertBanner } from '@/components/ui/AlertBanner'
 import { Button } from '@/components/ui/Button'
@@ -73,6 +73,20 @@ export function BulkBar({ selection, noun, actions }: { selection: Selection; no
   const [busy, setBusy] = useState<string | null>(null)
   const [outcome, setOutcome] = useState<BulkOutcome | null>(null)
   const [typed, setTyped] = useState('')
+  const { count, clear } = selection
+
+  // Esc clears the ticks, unless a dialog is open (it closes first).
+  useEffect(() => {
+    if (!count) return
+    // Room under the list so the toolbar never covers the last rows.
+    document.documentElement.dataset.bulkbar = 'on'
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('dialog[open]') && clear()
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      delete document.documentElement.dataset.bulkbar
+    }
+  }, [count, clear])
 
   async function go(action: BulkAction) {
     setAsking(null)
@@ -94,34 +108,47 @@ export function BulkBar({ selection, noun, actions }: { selection: Selection; no
     <>
       {outcome && <OutcomeBanner outcome={outcome} noun={noun} onClose={() => setOutcome(null)} />}
       {selection.count > 0 && (
+        // A floating toolbar over the bottom of the page, centred on the content area (not the menu), so it stays
+        // in reach while scrolling a long list and doesn't push the table down.
         <div
           role="region"
           aria-label="Bulk actions"
-          className="sticky top-[calc(var(--topbar-height)+8px)] z-10 flex flex-wrap items-center gap-2 rounded-lg border border-brand bg-brand-subtle px-3 py-2 shadow-[var(--shadow-overlay)]"
+          className="fixed bottom-[max(20px,env(safe-area-inset-bottom))] left-[calc(var(--sidebar-width)+(100vw-var(--sidebar-width))/2)] z-30 flex max-w-[calc(100vw-var(--sidebar-width)-32px)] -translate-x-1/2 items-center gap-1 rounded-xl border border-default bg-surface p-1.5 shadow-[var(--shadow-overlay)] motion-safe:animate-[bulkbar-in_160ms_ease-out]"
         >
-          <span className="text-body-strong text-brand-text" aria-live="polite">
-            {plural(selection.count, noun[0], noun[1])} selected
+          <span className="flex shrink-0 items-center gap-2 pr-2 pl-1.5" aria-live="polite">
+            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-brand px-1.5 text-caption-strong text-on-brand tabular-nums">
+              {selection.count}
+            </span>
+            <span className="text-body-strong whitespace-nowrap text-primary max-sm:sr-only">{selection.count === 1 ? noun[0] : noun[1]} selected</span>
           </span>
+          <span className="h-6 w-px shrink-0 bg-[var(--color-default)]" aria-hidden />
+          <div className="flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
+            {actions.map((a) => (
+              <button
+                key={a.label}
+                type="button"
+                disabled={busy !== null}
+                onClick={() => (a.confirm ? setAsking(a) : void go(a))}
+                className={clsx(
+                  'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-body-strong whitespace-nowrap transition-colors focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none disabled:text-disabled [&_svg]:size-4',
+                  a.destructive ? 'text-[var(--color-error-fg)] enabled:hover:bg-error-bg' : 'text-primary enabled:hover:bg-surface-hover',
+                )}
+              >
+                {a.icon}
+                {busy === a.label ? 'Working…' : a.label}
+              </button>
+            ))}
+          </div>
+          <span className="h-6 w-px shrink-0 bg-[var(--color-default)]" aria-hidden />
           <button
             type="button"
             onClick={selection.clear}
-            className="inline-flex items-center gap-1 rounded-sm px-1 text-caption-strong text-secondary hover:text-primary"
+            aria-label="Clear selection"
+            title="Clear selection (Esc)"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-icon hover:bg-surface-hover hover:text-primary focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none"
           >
-            <X aria-hidden className="size-3.5" />
-            Clear
+            <X aria-hidden className="size-4" />
           </button>
-          <div className="flex-1" />
-          {actions.map((a) => (
-            <Button
-              key={a.label}
-              variant={a.destructive ? 'destructive' : 'secondary'}
-              icon={a.icon}
-              disabled={busy !== null}
-              onClick={() => (a.confirm ? setAsking(a) : void go(a))}
-            >
-              {busy === a.label ? 'Working…' : a.label}
-            </Button>
-          ))}
         </div>
       )}
       {asking?.confirm && (

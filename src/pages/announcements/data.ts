@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef } from 'react'
 import { api } from '@/lib/api'
 
 export type Audience = 'everyone' | 'staff' | 'participants' | 'cohort'
@@ -14,7 +15,14 @@ export interface Announcement {
   createdAt: string
   edited: boolean
   read: boolean
+  /** Only for the author and admins: how many have seen it, and the latest few. */
+  seenBy: { count: number; recent: { id: string; name: string }[] } | null
   can: { edit: boolean }
+}
+
+export interface Viewers {
+  seen: { id: string; name: string; role: string; at: string }[]
+  notSeen: { id: string; name: string; role: string }[]
 }
 
 export interface AnnouncementsView {
@@ -97,3 +105,49 @@ export const audienceLabel = (a: Pick<Announcement, 'audience' | 'cohort'>) =>
       : a.audience === 'participants'
         ? 'All participants'
         : (a.cohort?.name ?? 'A cohort')
+
+/** Who has and hasn't seen one announcement; fetched only when the list is opened. */
+export const useViewers = (id: string) =>
+  useQuery({ queryKey: [...key, id, 'views'], queryFn: ({ signal }) => api<Viewers>(`/v1/announcements/${id}/views`, { signal }) })
+
+/**
+ * Records the cards that come onto this person's screen (at least half visible), sent together a second later so
+ * a visit is one small request. Each card is sent once per page load; the server counts each person once.
+ */
+export function useRecordSeen(ids: string[]) {
+  const sent = useRef(new Set<string>())
+  const pending = useRef(new Set<string>())
+  const timer = useRef<number | undefined>(undefined)
+  const joined = ids.join(',')
+  useEffect(() => {
+    if (!joined || typeof IntersectionObserver === 'undefined') return
+    const flush = () => {
+      const batch = [...pending.current]
+      pending.current.clear()
+      if (batch.length) void api('/v1/announcements/seen', { method: 'POST', body: { ids: batch } }).catch(() => batch.forEach((id) => sent.current.delete(id)))
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const id = (e.target as HTMLElement).dataset.seenId
+          if (!e.isIntersecting || !id || sent.current.has(id)) continue
+          sent.current.add(id)
+          pending.current.add(id)
+          observer.unobserve(e.target)
+        }
+        window.clearTimeout(timer.current)
+        timer.current = window.setTimeout(flush, 1000)
+      },
+      { threshold: 0.5 },
+    )
+    for (const id of joined.split(',')) {
+      const el = document.querySelector(`[data-seen-id="${id}"]`)
+      if (el && !sent.current.has(id)) observer.observe(el)
+    }
+    return () => {
+      observer.disconnect()
+      window.clearTimeout(timer.current)
+      flush()
+    }
+  }, [joined])
+}

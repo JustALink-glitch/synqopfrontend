@@ -47,7 +47,7 @@ export function Table({ columns, children, className, select }: { columns: Colum
       <thead>
         <tr className="bg-surface-subtle">
           {select && (
-            <th scope="col" style={{ width: 40 }} className="h-8 rounded-l-sm pl-3">
+            <th scope="col" style={{ width: 40 }} className="h-8 rounded-l-sm pl-3 text-left align-middle">
               <SelectBox {...select} />
             </th>
           )}
@@ -87,7 +87,7 @@ export function Row({ to, children, select }: { to?: string; children: ReactNode
       )}
     >
       {select && (
-        <td className="!pr-0" onClick={(e) => e.stopPropagation()}>
+        <td className="!pr-0 text-left" onClick={(e) => e.stopPropagation()}>
           <SelectBox {...select} />
         </td>
       )}

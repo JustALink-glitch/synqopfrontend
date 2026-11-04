@@ -6,7 +6,7 @@ import { PageHeader, Panel } from '@/components/ui/Page'
 import { isWideScreen } from './screen'
 import { settingsMenu } from './settingsMenu'
 
-/** /admin/settings — F1 Settings frame: side menu on the left, the chosen page on the right. */
+/** /admin/settings — F1 Settings frame: side menu on the left (stays put on desktop), the chosen page on the right. */
 export function SettingsLayout() {
   // On phones and tablets the index (F1.00) is the menu, so the tab strip isn't shown there.
   const atIndex = Boolean(useMatch('/admin/settings'))
@@ -17,7 +17,7 @@ export function SettingsLayout() {
         <nav
           aria-label="Settings"
           className={clsx(
-            'flex flex-col gap-4 max-lg:-mx-1 max-lg:flex-row max-lg:gap-1 max-lg:overflow-x-auto max-lg:px-1 max-lg:pb-1',
+            'flex flex-col gap-4 lg:sticky lg:top-[calc(var(--topbar-height)+20px)] lg:max-h-[calc(100dvh-var(--topbar-height)-40px)] lg:overflow-y-auto lg:overscroll-contain lg:[scrollbar-width:thin] max-lg:-mx-1 max-lg:flex-row max-lg:gap-1 max-lg:overflow-x-auto max-lg:px-1 max-lg:pb-1',
             atIndex && 'max-lg:hidden',
           )}
         >
