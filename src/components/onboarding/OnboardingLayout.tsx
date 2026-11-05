@@ -32,7 +32,7 @@ export function OnboardingLayout({
   return (
     <div className="flex min-h-dvh bg-canvas">
       <aside className="sticky top-0 flex h-dvh w-[400px] shrink-0 flex-col gap-10 border-r border-default bg-surface-subtle p-10 max-lg:hidden">
-        <img src={logo} alt="Synqop" width={124} height={37} className="h-[37.076px] w-[124px]" />
+        <img src={logo} alt="Synqop" width={138} height={30} className="h-[30px] w-auto self-start" />
         <div className="flex flex-col gap-2">
           <p className="text-heading-group text-primary">{panelTitle}</p>
           <p className="text-body-large text-secondary">{panelBody}</p>
@@ -52,7 +52,7 @@ export function OnboardingLayout({
         {/* Onboarding / Mobile header: logo, step count and segmented progress. */}
         <header className="flex flex-col gap-3 border-b border-default bg-surface px-4 pt-4 pb-3 lg:hidden">
           <div className="flex items-center justify-between">
-            <img src={logo} alt="Synqop" width={92} height={28} className="h-[27.5px] w-[92px]" />
+            <img src={logo} alt="Synqop" width={101} height={22} className="h-[22px] w-auto" />
             {steps && (
               <p className="text-body text-secondary">
                 Step {Math.max(1, steps.findIndex((s) => s.state === 'current') + 1)} of {steps.length}

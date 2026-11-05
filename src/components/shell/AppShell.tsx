@@ -50,7 +50,7 @@ export function AppShell({ area }: { area: Area }) {
       <aside className="sticky top-0 flex h-dvh w-sidebar shrink-0 flex-col gap-5 border-r border-default bg-surface px-4 pt-5 pb-4 max-md:hidden rail:items-center rail:px-3">
         <div className="flex items-center justify-between gap-2 rail:justify-center">
           <Link to={`/${area}`} className="rounded-md px-2 py-1 rail:hidden" aria-label="Synqop home">
-            <img src={logo} alt="Synqop" width={110} height={33} />
+            <img src={logo} alt="Synqop" width={120} height={26} className="h-[26px] w-auto" />
           </Link>
           <RailToggle home={`/${area}`} />
         </div>
@@ -372,7 +372,7 @@ function MobileTopBar({ me, area, onMenu }: { me: Me; area: Area; onMenu: () => 
         <MenuDot />
       </button>
       <Link to={`/${area}`} aria-label="Synqop home">
-        <img src={logo} alt="Synqop" width={100} height={30} />
+        <img src={logo} alt="Synqop" width={110} height={24} className="h-6 w-auto" />
       </Link>
       <div className="flex-1" />
       <Link to={`/${area}/search`} aria-label="Search" className="inline-flex size-11 items-center justify-center rounded-md text-icon hover:bg-surface-hover">
@@ -415,7 +415,7 @@ function NavigationDrawer({ me, area, items, onClose }: { me: Me; area: Area; it
         className="relative flex h-full w-[320px] max-w-[85vw] flex-col gap-4 bg-surface px-4 pt-3 pb-4 outline-none"
       >
         <div className="flex items-center justify-between">
-          <img src={logo} alt="Synqop" width={100} height={30} />
+          <img src={logo} alt="Synqop" width={110} height={24} className="h-6 w-auto" />
           <button
             type="button"
             aria-label="Close navigation"
