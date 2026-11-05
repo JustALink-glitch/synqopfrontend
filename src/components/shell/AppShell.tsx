@@ -6,6 +6,7 @@ import { FileViewerHost } from '@/components/files/FileViewer'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import logo from '@/assets/synqop-logo.svg'
+import mark from '@/assets/synqop-mark.svg'
 import { navFor, type NavItem } from '@/app/navigation'
 import { useAttentionCount } from '@/pages/admin/attention/data'
 import { useAuth, type Me } from '@/auth/useAuth'
@@ -51,7 +52,7 @@ export function AppShell({ area }: { area: Area }) {
           <Link to={`/${area}`} className="rounded-md px-2 py-1 rail:hidden" aria-label="Synqop home">
             <img src={logo} alt="Synqop" width={110} height={33} />
           </Link>
-          <RailToggle />
+          <RailToggle home={`/${area}`} />
         </div>
         <OrganisationLabel me={me} area={area} />
         <SidebarNav area={area} items={items} />
@@ -92,8 +93,12 @@ function readRail() {
   }
 }
 
-/** Collapse or open the sidebar on wide screens (pilot feedback, Nov 2026); remembered on this device. */
-function RailToggle() {
+/**
+ * Collapse or open the sidebar on wide screens (pilot feedback, Nov 2026); remembered on this device.
+ * Collapsed, the rail shows the Synqop mark, which turns into the open icon on hover. Below 1280px the
+ * sidebar is always a rail and the mark goes home.
+ */
+function RailToggle({ home }: { home: string }) {
   const [collapsed, setCollapsed] = useState(readRail)
   useEffect(() => {
     document.documentElement.dataset.rail = collapsed ? 'on' : 'off'
@@ -103,18 +108,46 @@ function RailToggle() {
       // Private windows: it just isn't remembered.
     }
   }, [collapsed])
-  const Icon = collapsed ? PanelLeftOpen : PanelLeftClose
+  const button =
+    'size-9 shrink-0 items-center justify-center rounded-md text-icon focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none'
   return (
-    <button
-      type="button"
-      onClick={() => setCollapsed((c) => !c)}
-      aria-label={collapsed ? 'Open the menu' : 'Collapse the menu'}
-      aria-expanded={!collapsed}
-      title={collapsed ? 'Open the menu' : 'Collapse the menu'}
-      className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-icon hover:bg-surface-hover hover:text-primary focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none max-xl:hidden"
-    >
-      <Icon className="size-[18px]" aria-hidden />
-    </button>
+    <>
+      {collapsed ? (
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          aria-label="Open the menu"
+          aria-expanded={false}
+          title="Open the menu"
+          className={clsx(button, 'group relative inline-flex hover:bg-surface-hover hover:text-primary max-xl:hidden')}
+        >
+          <img
+            src={mark}
+            alt=""
+            aria-hidden="true"
+            className="size-7 motion-safe:transition-[opacity,transform] motion-safe:duration-150 motion-safe:ease-out group-hover:scale-90 group-hover:opacity-0 group-focus-visible:scale-90 group-focus-visible:opacity-0"
+          />
+          <PanelLeftOpen
+            aria-hidden
+            className="absolute size-[18px] scale-90 opacity-0 motion-safe:transition-[opacity,transform] motion-safe:duration-150 motion-safe:ease-out group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100"
+          />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setCollapsed(true)}
+          aria-label="Collapse the menu"
+          aria-expanded
+          title="Collapse the menu"
+          className={clsx(button, 'inline-flex hover:bg-surface-hover hover:text-primary max-xl:hidden')}
+        >
+          <PanelLeftClose className="size-[18px]" aria-hidden />
+        </button>
+      )}
+      <Link to={home} aria-label="Synqop home" className={clsx(button, 'hidden max-xl:inline-flex')}>
+        <img src={mark} alt="" aria-hidden="true" className="size-7" />
+      </Link>
+    </>
   )
 }
 

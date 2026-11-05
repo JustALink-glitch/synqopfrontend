@@ -97,9 +97,29 @@ export function relativeDay(value: string | Date, timeZone?: string): string {
   return formatDay(value, timeZone)
 }
 
-/** "10:00–12:00" in a time zone. */
+/** 90 → "1h 30m", 120 → "2h", 45 → "45m". */
+export function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = Math.round(minutes % 60)
+  return h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`
+}
+
+/** "2h (10:00–12:00)", with ", next day" when it runs past midnight — duration first (pilot feedback, Nov 2026). */
 export function formatTimeRange(start: string | Date, end: string | Date, timeZone?: string): string {
-  return `${formatTime(start, timeZone)}–${formatTime(end, timeZone)}`
+  const minutes = (new Date(end).getTime() - new Date(start).getTime()) / 60_000
+  const nextDay = localDate(end, timeZone) > localDate(start, timeZone)
+  return `${formatDuration(minutes)} (${formatTime(start, timeZone)}–${formatTime(end, timeZone)}${nextDay ? ', next day' : ''})`
+}
+
+/** A session's length, e.g. "2h" — under the start time in compact lists. */
+export const lengthOf = (start: string | Date, end: string | Date) => formatDuration((new Date(end).getTime() - new Date(start).getTime()) / 60_000)
+
+/** "22:00" + 150 → { time: "00:30", nextDay: true }. */
+export function addToClock(time: string, minutes: number): { time: string; nextDay: boolean } {
+  const [h, m] = time.split(':').map(Number)
+  const total = h! * 60 + m! + minutes
+  const wrapped = ((total % 1440) + 1440) % 1440
+  return { time: `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`, nextDay: total >= 1440 }
 }
 
 /** The organisation-local date of a moment, as "2026-10-21". */

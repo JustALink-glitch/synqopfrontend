@@ -1,6 +1,13 @@
-import { useState } from 'react'
+import { CheckCircle2, MessageSquarePlus } from 'lucide-react'
+import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { BulkBar } from '@/components/collection/Collection'
+import { useSelection } from '@/components/collection/selection'
 import { StatePanel } from '@/components/StatePanel'
+import { Checkbox } from '@/components/ui/Choice'
+import { Dialog } from '@/components/ui/Dialog'
+import { TextAreaField } from '@/components/ui/TextField'
+import { ApiError } from '@/lib/api'
 import { AlertBanner } from '@/components/ui/AlertBanner'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
@@ -23,10 +30,13 @@ import {
   signalOf,
   useAttention,
   useInterventions,
+  useRecordMany,
+  useResolveMany,
   type FlaggedRow,
   type Outcome,
   type Signal,
 } from './data'
+import { RecordInterventionDialog } from './AttentionPanels'
 
 type SignalFilter = 'all' | Signal
 type FollowUp = 'any' | 'none' | Outcome
@@ -63,6 +73,13 @@ export function NeedsAttentionPage() {
       (!term || r.participant.name.toLowerCase().includes(term)),
   )
   const paged = paginate(visible, page, 10)
+  // Tick rows to resolve or follow up with several people at once (pilot feedback, Nov 2026).
+  const selection = useSelection(paged.rows.map((r) => r.participant.id))
+  const chosen = paged.rows.filter((r) => selection.has(r.participant.id))
+  const [dialog, setDialog] = useState<'resolve' | 'record' | null>(null)
+  const [done, setDone] = useState<string | null>(null)
+  const recordMany = useRecordMany()
+  const canResolve = query.data?.canResolve ?? false
   const count = (s: Signal) => rows.filter((r) => r.flags.some((f) => signalOf[f.rule] === s)).length
   const cohortCount = new Set(rows.map((r) => r.cohort.id)).size
 
@@ -90,6 +107,7 @@ export function NeedsAttentionPage() {
           {rulesSentence(query.data.rules)} A flag clears when the rules stop matching, or when an admin resolves it with a note.
         </AlertBanner>
       )}
+      {done && <AlertBanner tone="success" title={done} />}
       {query.isPending ? (
         <Panel aria-busy="true" aria-label="Checking participants" className="h-[240px]">
           <span className="sr-only">Checking participants</span>
@@ -148,19 +166,64 @@ export function NeedsAttentionPage() {
             <div className="flex-1" />
             <SearchField aria-label="Search participants" placeholder="Search participants" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
+          <BulkBar
+            selection={selection}
+            noun={['participant', 'participants']}
+            actions={[
+              ...(canResolve ? [{ label: 'Resolve', icon: <CheckCircle2 aria-hidden className="size-4" />, run: async () => (setDone(null), setDialog('resolve')) }] : []),
+              { label: 'Record follow-up', icon: <MessageSquarePlus aria-hidden className="size-4" />, run: async () => (setDone(null), setDialog('record')) },
+            ]}
+          />
+          {dialog === 'resolve' && (
+            <ResolveManyDialog
+              people={chosen.map((r) => ({ id: r.participant.id, name: r.participant.name }))}
+              onClose={() => setDialog(null)}
+              onDone={(n) => {
+                setDialog(null)
+                selection.clear()
+                setDone(`Resolved flags for ${plural(n, 'participant')}`)
+              }}
+            />
+          )}
+          {dialog === 'record' && (
+            <RecordInterventionDialog
+              memberId=""
+              name={chosen.length === 1 ? chosen[0]!.participant.name : plural(chosen.length, 'participant')}
+              cohortName={chosen.length === 1 ? chosen[0]!.cohort.name : ''}
+              timeZone={timeZone}
+              onClose={() => setDialog(null)}
+              onSaved={() => {
+                setDialog(null)
+                const n = chosen.length
+                selection.clear()
+                setDone(`Follow-up recorded for ${plural(n, 'participant')}`)
+              }}
+              save={{
+                pending: recordMany.isPending,
+                run: async (input) => {
+                  const result = await recordMany.mutateAsync({ memberIds: chosen.map((r) => r.participant.id), input })
+                  if (result.failed.length) throw new ApiError(400, 'partial', `Saved for ${result.saved}; ${plural(result.failed.length, 'participant')} couldn’t be saved. Try them again.`)
+                },
+              }}
+            />
+          )}
           <Panel className="gap-0 max-md:py-2">
             {visible.length === 0 ? (
               <StatePanel kind="no-results" title="No one matches" description="Try another filter." />
             ) : (
               <>
                 <div className="max-md:hidden">
-                  <Table columns={columns}>
+                  <Table columns={columns} select={{ checked: selection.header, onChange: selection.toggleAll, label: 'Select everyone on this page' }}>
                     {paged.rows.map((r) => {
                       const first = r.flags[0]!
                       const what = describeFlag(first, timeZone)
                       const to = `/admin/participants/${r.participant.id}`
                       return (
-                        <Row key={r.enrolmentId} to={to}>
+                        <Row
+                          key={r.enrolmentId}
+                          to={to}
+                          select={{ checked: selection.has(r.participant.id), onChange: () => selection.toggle(r.participant.id), label: `Select ${r.participant.name}` }}
+                        >
                           <Cell>
                             <span className="flex min-w-0 items-center gap-3">
                               <Avatar initials={initials(r.participant.name)} seed={r.participant.id} size={32} />
@@ -205,8 +268,14 @@ export function NeedsAttentionPage() {
                 </div>
                 <ul className="md:hidden">
                   {paged.rows.map((r) => (
-                    <li key={r.enrolmentId} className="border-b border-default last:border-b-0">
-                      <Link to={`/admin/participants/${r.participant.id}`} className="flex items-center gap-3 py-3">
+                    <li key={r.enrolmentId} className="flex items-center gap-3 border-b border-default last:border-b-0">
+                      <Checkbox
+                        label={<span className="sr-only">Select {r.participant.name}</span>}
+                        checked={selection.has(r.participant.id)}
+                        onChange={() => selection.toggle(r.participant.id)}
+                        className="-m-2 p-2"
+                      />
+                      <Link to={`/admin/participants/${r.participant.id}`} className="flex min-w-0 flex-1 items-center gap-3 py-3">
                         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                           <span className="truncate text-body-strong text-primary">{r.participant.name}</span>
                           <span className="truncate text-caption text-secondary">{describeFlag(r.flags[0]!, timeZone).title}</span>
@@ -370,5 +439,60 @@ export function InterventionsPage() {
         </>
       )}
     </>
+  )
+}
+
+/** Resolve several participants' flags with one note (pilot feedback, Nov 2026). */
+function ResolveManyDialog({ people, onClose, onDone }: { people: { id: string; name: string }[]; onClose: () => void; onDone: (participants: number) => void }) {
+  const resolve = useResolveMany()
+  const [note, setNote] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const names = people.map((p) => p.name.split(' ')[0])
+  const who = names.length <= 3 ? names.join(', ').replace(/, ([^,]*)$/, ' and $1') : `${names.slice(0, 2).join(', ')} and ${names.length - 2} others`
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!note.trim()) return setError('Add a note. It’s kept with each flag.')
+    try {
+      const result = await resolve.mutateAsync({ memberIds: people.map((p) => p.id), note })
+      onDone(result.participants)
+    } catch (err) {
+      setError(err instanceof ApiError && err.status < 500 ? err.message : 'Nothing was resolved. Try again.')
+    }
+  }
+
+  return (
+    <Dialog
+      open
+      onClose={() => !resolve.isPending && onClose()}
+      width={440}
+      title={`Resolve ${plural(people.length, 'participant')}`}
+      description={`Closes the open flags for ${who}. Anyone who matches a rule again later gets a new flag.`}
+      actions={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={resolve.isPending}>
+            Cancel
+          </Button>
+          <Button type="submit" form="resolve-many" disabled={resolve.isPending}>
+            {resolve.isPending ? 'Resolving…' : `Resolve ${people.length}`}
+          </Button>
+        </>
+      }
+    >
+      <form id="resolve-many" onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
+        <TextAreaField
+          label="Note"
+          autoFocus
+          value={note}
+          maxLength={1000}
+          onChange={(e) => {
+            setNote(e.target.value)
+            setError(null)
+          }}
+          error={error}
+          helper="Required. Kept with each flag; visible to admins and their trainers."
+        />
+      </form>
+    </Dialog>
   )
 }

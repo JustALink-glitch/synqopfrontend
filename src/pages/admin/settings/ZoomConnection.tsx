@@ -59,7 +59,9 @@ export function ZoomConnection({ zoom }: { zoom: AttendanceSettings['zoom'] }) {
   const description = zoom.problem
     ? zoom.problem
     : zoom.connected
-      ? `Attendance imports when each meeting ends.${zoom.lastImportAt ? ` Last import: ${when(zoom.lastImportAt)}.` : ''}`
+      ? `Attendance imports when each meeting ends.${zoom.lastImportAt ? ` Last import: ${when(zoom.lastImportAt)}.` : ''}${
+          (zoom.hosts ?? 0) > 1 ? ` ${zoom.hosts} licensed Zoom users can host classes at the same time.` : ''
+        }`
       : zoom.available
         ? 'Connect your organisation’s Zoom account. Synqop then creates a meeting for each online session and imports attendance after it.'
         : 'Zoom isn’t set up on this server yet. Until it is, paste a meeting link on each session and trainers mark attendance on the register.'
@@ -87,6 +89,25 @@ export function ZoomConnection({ zoom }: { zoom: AttendanceSettings['zoom'] }) {
           <Badge tone="neutral">Not available</Badge>
         )}
       </div>
+      {zoom.connected && !zoom.problem && (zoom.missing?.length ?? 0) > 0 && (
+        <div className="flex items-start gap-3 pt-3 max-md:flex-col">
+          <AlertBanner title="New: connect Zoom again to turn these on">
+            {[
+              zoom.missing!.includes('recordings') && 'class recordings on each session',
+              zoom.missing!.includes('hosts') && 'classes at the same time on different Zoom users',
+              zoom.missing!.includes('start') && 'a Start class button for trainers',
+            ]
+              .filter(Boolean)
+              .join(', ')
+              .replace(/, ([^,]*)$/, ' and $1')
+              .replace(/^./, (c) => c.toUpperCase())}
+            . Zoom asks you to approve the new permissions; nothing else changes.
+          </AlertBanner>
+          <Button variant="secondary" onClick={start} disabled={connect.isPending} className="shrink-0">
+            {connect.isPending ? 'Opening Zoom…' : 'Connect again'}
+          </Button>
+        </div>
+      )}
       {error && (
         <div className="pt-3">
           <AlertBanner tone="error" title={error} />

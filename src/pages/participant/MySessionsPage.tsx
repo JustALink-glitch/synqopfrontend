@@ -1,6 +1,7 @@
 import { Video } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
+import { RecordingPanel } from '@/components/sessions/Recording'
 import { StatePanel } from '@/components/StatePanel'
 import { AlertBanner } from '@/components/ui/AlertBanner'
 import { Button } from '@/components/ui/Button'
@@ -273,6 +274,7 @@ export function MySessionPage() {
               <p className="text-caption text-secondary">Your trainer marks attendance in the room.</p>
             </Panel>
           )}
+          {s.recording && <RecordingPanel recording={s.recording} note="Missed something? Watch it back any time while it’s shared." />}
           {s.status === 'held' && (
             <Panel aria-labelledby="attendance-title" className="gap-1">
               <PanelHeader

@@ -153,6 +153,8 @@ export interface MySession {
   location: string | null
   joinUrl: string | null
   cancellationReason: string | null
+  /** The class recording, when the organisation shares recordings (pilot feedback, Nov 2026). */
+  recording?: { url: string; passcode: string | null; minutes: number | null } | null
   trainer: string | null
   trainerBio?: string | null
   number: number | null

@@ -10,7 +10,7 @@ import { Metrics } from '@/components/ui/Metrics'
 import { Badge, EmptyState, PageHeader, Panel, PanelHeader } from '@/components/ui/Page'
 import { Cell, Row, Stacked, Table, type Column } from '@/components/ui/Table'
 import { api } from '@/lib/api'
-import { formatDate, formatDay, formatTime, plural, relativeDay } from '@/lib/format'
+import { formatDate, formatDay, formatTime, lengthOf, plural, relativeDay } from '@/lib/format'
 import { initials } from '@/lib/people'
 import { describeFlag, followUpLine, signalOf, useAttention } from '@/pages/admin/attention/data'
 import { todayLong } from '@/pages/participant/data'
@@ -295,7 +295,7 @@ function TodayPanel({ data: d, nextLine }: { data: Today; nextLine: string | nul
                 <Link to={`/trainer/sessions/${s.id}`} className="flex min-w-0 flex-1 gap-3 hover:opacity-90">
                   <span className="flex w-12 shrink-0 flex-col text-caption tabular-nums">
                     <span className="text-body-strong text-primary">{formatTime(s.startsAt, timeZone)}</span>
-                    <span className="text-secondary">{formatTime(s.endsAt, timeZone)}</span>
+                    <span className="whitespace-nowrap text-secondary">{lengthOf(s.startsAt, s.endsAt)}</span>
                   </span>
                   <span className={`w-[3px] shrink-0 rounded-full ${s.mode === 'online' ? 'bg-brand' : 'bg-success'}`} aria-hidden="true" />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">

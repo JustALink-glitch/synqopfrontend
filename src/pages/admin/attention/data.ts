@@ -105,6 +105,26 @@ export const useRecordIntervention = (memberId: string) =>
 export const useResolveFlags = (memberId: string) =>
   useAttentionMutation((note: string) => api<{ resolved: number }>(`/v1/attention/participants/${memberId}/resolve`, { method: 'POST', body: { note } }))
 
+/** Several participants at once (pilot feedback, Nov 2026): one note on every flag it closes. */
+export const useResolveMany = () =>
+  useAttentionMutation((input: { memberIds: string[]; note: string }) =>
+    api<{ resolved: number; participants: number }>('/v1/attention/participants/resolve', { method: 'POST', body: input }),
+  )
+
+/** The same follow-up recorded for each of several participants. */
+export const useRecordMany = () =>
+  useAttentionMutation(async ({ memberIds, input }: { memberIds: string[]; input: InterventionInput }) => {
+    const failed: string[] = []
+    for (const id of memberIds) {
+      try {
+        await api(`/v1/attention/participants/${id}/interventions`, { method: 'POST', body: input })
+      } catch {
+        failed.push(id)
+      }
+    }
+    return { saved: memberIds.length - failed.length, failed }
+  })
+
 export type Signal = 'attendance' | 'assignments' | 'activity'
 export const signalOf: Record<Rule, Signal> = {
   low_attendance: 'attendance',

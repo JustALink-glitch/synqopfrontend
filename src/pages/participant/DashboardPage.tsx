@@ -7,7 +7,7 @@ import { BookOpenIcon, CalendarIcon, ChevronRightIcon, ClipboardIcon } from '@/c
 import { Metrics } from '@/components/ui/Metrics'
 import { EmptyState, PageHeader, Panel, PanelHeader } from '@/components/ui/Page'
 import { Cell, Row, Stacked, Table, type Column } from '@/components/ui/Table'
-import { formatDate, formatDay, formatTime, plural, relativeDay } from '@/lib/format'
+import { formatDate, formatDay, formatTime, lengthOf, plural, relativeDay } from '@/lib/format'
 import { initials } from '@/lib/people'
 import { formatDue } from '@/pages/assignments/data'
 import { daysUntil, sessionWhere, todayLong, useMyAssignments, useMyGrades, useMyOverview, type MyAssignment, type MyOverview, type MySession } from './data'
@@ -324,7 +324,7 @@ function UpcomingPanel({ sessions, timeZone }: { sessions: MySession[]; timeZone
               <Link key={s.id} to={`/participant/sessions/${s.id}`} className="flex gap-3 border-b border-default pb-3 last:border-b-0 hover:bg-surface-hover">
                 <span className="flex w-12 shrink-0 flex-col tabular-nums">
                   <span className="text-body-strong text-primary">{formatTime(s.startsAt, timeZone)}</span>
-                  <span className="text-caption text-secondary">{formatTime(s.endsAt, timeZone)}</span>
+                  <span className="text-caption whitespace-nowrap text-secondary">{lengthOf(s.startsAt, s.endsAt)}</span>
                 </span>
                 <span className={`flex min-w-0 flex-1 flex-col gap-0.5 border-l-[3px] pl-3 ${s.mode === 'online' ? 'border-brand' : 'border-success'}`}>
                   <span className="truncate text-body-strong text-primary">{s.course.name}</span>

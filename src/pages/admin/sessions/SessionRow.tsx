@@ -1,9 +1,10 @@
 import clsx from 'clsx'
 import { CircleAlert, MapPin, Video } from 'lucide-react'
 import { Link } from 'react-router'
+import { Checkbox } from '@/components/ui/Choice'
 import { UserGroupIcon } from '@/components/ui/icons'
 import { Badge } from '@/components/ui/Page'
-import { formatTime } from '@/lib/format'
+import { formatTime, lengthOf } from '@/lib/format'
 import { whereLabel, type Session, type SessionStatus } from './data'
 import { useSessionPaths } from './paths'
 
@@ -25,18 +26,37 @@ function statusLine(s: Session): { text: string; tone: 'warning' | 'muted' } | n
  * One session in a day list (C1.01, A3.02 Upcoming sessions): time, a mode accent
  * (brand for online, green for in person), course, cohort and trainer, place, and who's expected.
  */
-export function SessionRow({ session: s, timeZone, showCohort = true }: { session: Session; timeZone: string | undefined; showCohort?: boolean }) {
+export function SessionRow({
+  session: s,
+  timeZone,
+  showCohort = true,
+  select,
+}: {
+  session: Session
+  timeZone: string | undefined
+  showCohort?: boolean
+  /** A tick box for bulk actions (cancel several), on sessions that can still change. */
+  select?: { checked: boolean; onChange: () => void }
+}) {
   const paths = useSessionPaths()
   const line = statusLine(s)
   return (
-    <li className="border-b border-default last:border-b-0">
+    <li className="flex items-center gap-2 border-b border-default last:border-b-0">
+      {select && (
+        <Checkbox
+          label={<span className="sr-only">Select {s.title}, {formatTime(s.startsAt, timeZone)}</span>}
+          checked={select.checked}
+          onChange={select.onChange}
+          className="-my-2 -ml-2 p-2"
+        />
+      )}
       <Link
         to={paths.session(s.id)}
-        className="flex items-stretch gap-3 rounded-sm py-2.5 hover:bg-surface-hover focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none"
+        className="flex min-w-0 flex-1 items-stretch gap-3 rounded-sm py-2.5 hover:bg-surface-hover focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none"
       >
-        <span className="flex w-11 shrink-0 flex-col gap-0.5 tabular-nums">
+        <span className="flex w-12 shrink-0 flex-col gap-0.5 tabular-nums">
           <span className={clsx('text-body-emphasis', s.cancelled ? 'text-muted line-through' : 'text-primary')}>{formatTime(s.startsAt, timeZone)}</span>
-          <span className="text-caption text-secondary">{formatTime(s.endsAt, timeZone)}</span>
+          <span className="text-caption whitespace-nowrap text-secondary">{lengthOf(s.startsAt, s.endsAt)}</span>
         </span>
         <span
           aria-hidden="true"

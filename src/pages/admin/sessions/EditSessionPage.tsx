@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { StatePanel } from '@/components/StatePanel'
+import { ClashWarning } from '@/components/sessions/ClashWarning'
+import { DurationField } from '@/components/sessions/DurationField'
 import { AlertBanner } from '@/components/ui/AlertBanner'
 import { Button } from '@/components/ui/Button'
 import { Checkbox, RadioGroup } from '@/components/ui/Choice'
@@ -11,10 +13,10 @@ import { PageHeader, Panel, PanelHeader } from '@/components/ui/Page'
 import { SelectField, TextField } from '@/components/ui/TextField'
 import { ApiError } from '@/lib/api'
 import { formatDay, formatTime, localDate, plural, weekdayList } from '@/lib/format'
-import { useEditSession, useSession, useSessionOptions, useSessions, type EditInput, type Session, type SessionMode } from './data'
+import { type EditInput, type Session, type SessionMode, useClashes, useEditSession, useSession, useSessionOptions, useSessions } from './data'
 import { useSessionPaths } from './paths'
 
-type Errors = Partial<Record<'date' | 'start' | 'end' | 'location' | 'joinUrl' | 'trainerMemberId' | 'scope', string>>
+type Errors = Partial<Record<'date' | 'start' | 'durationMinutes' | 'location' | 'joinUrl' | 'trainerMemberId' | 'scope', string>>
 
 /** /admin/courses/sessions/:id/edit — C1.06; /trainer/sessions/:id/edit — T3.06 Edit session (+ C1.04 for repeating sessions). */
 export function EditSessionPage() {
@@ -67,7 +69,7 @@ function EditForm({ session: s }: { session: Session }) {
 
   const [date, setDate] = useState(localDate(s.startsAt, timeZone))
   const [start, setStart] = useState(formatTime(s.startsAt, timeZone))
-  const [end, setEnd] = useState(formatTime(s.endsAt, timeZone))
+  const [minutes, setMinutes] = useState(Math.round((new Date(s.endsAt).getTime() - new Date(s.startsAt).getTime()) / 60_000))
   const [mode, setMode] = useState<SessionMode>(s.mode)
   const [location, setLocation] = useState(s.location ?? '')
   const [joinUrl, setJoinUrl] = useState(s.joinUrl ?? '')
@@ -80,6 +82,11 @@ function EditForm({ session: s }: { session: Session }) {
   const cohort = options.data?.cohorts.find((c) => c.id === s.cohort.id)
   const course = cohort?.courses.find((c) => c.courseId === s.course.id)
   const trainers = course?.trainers.filter((t) => t.status !== 'deactivated') ?? []
+  const effectiveTrainer = trainerId || trainers.find((t) => t.isLead)?.id || null
+  const trainerPerson = trainers.find((t) => t.id === effectiveTrainer)
+  const clashes = useClashes(
+    date && /^\d{2}:\d{2}$/.test(start) ? { date, start, durationMinutes: minutes, trainerMemberId: effectiveTrainer, mode, joinUrl, excludeId: s.id } : null,
+  )
   const cohortDates = cohort
   const originalDate = localDate(s.startsAt, timeZone)
   const remaining = (series.data?.sessions ?? []).filter((x) => x.series?.id === s.series?.id && x.status === 'scheduled')
@@ -92,7 +99,6 @@ function EditForm({ session: s }: { session: Session }) {
         : cohortDates && (date < cohortDates.startsOn || date > cohortDates.endsOn)
           ? `Choose a date within ${s.cohort.name}.`
           : undefined,
-      end: end > start ? undefined : 'End must be after the start.',
       location: mode === 'in_person' && !location.trim() ? 'Enter where it happens.' : undefined,
       joinUrl:
         mode === 'online' && joinUrl.trim() && !/^https:\/\/\S+$/.test(joinUrl.trim()) ? 'Paste the full meeting link, starting with https://' : undefined,
@@ -104,7 +110,7 @@ function EditForm({ session: s }: { session: Session }) {
   async function save(scope: EditInput['scope']) {
     setFailed(null)
     try {
-      const result = await edit.mutateAsync({ scope, date, start, end, mode, location, joinUrl, trainerMemberId: trainerId || null, notify })
+      const result = await edit.mutateAsync({ scope, date, start, durationMinutes: minutes, mode, location, joinUrl, trainerMemberId: trainerId || null, notify })
       navigate(paths.session(s.id), {
         replace: true,
         state: {
@@ -158,8 +164,8 @@ function EditForm({ session: s }: { session: Session }) {
                     error={errors.date}
                   />
                 </div>
+                <DurationField value={minutes} onChange={setMinutes} start={start} error={errors.durationMinutes} />
                 <TextField label="Start" type="time" value={start} onChange={(e) => setStart(e.target.value)} error={errors.start} />
-                <TextField label="End" type="time" value={end} onChange={(e) => setEnd(e.target.value)} error={errors.end} />
               </div>
             </FormSection>
             <FormSection title="Where">
@@ -204,6 +210,7 @@ function EditForm({ session: s }: { session: Session }) {
               </SelectField>
             </FormSection>
             <Checkbox label="Email participants and the trainer about the change" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+            <ClashWarning clashes={clashes.data} timeZone={timeZone} trainerName={trainerPerson ? `${trainerPerson.firstName} ${trainerPerson.lastName}` : undefined} />
             <div className="flex gap-3 max-md:flex-col-reverse max-md:[&>*]:h-11">
               <Button variant="secondary" onClick={() => navigate(paths.session(s.id))} disabled={edit.isPending}>
                 Cancel

@@ -6,7 +6,7 @@ import { Link } from 'react-router'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/ui/icons'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
-import { formatDate, formatTime, localDate } from '@/lib/format'
+import { formatDate, formatTime, formatTimeRange, lengthOf, localDate } from '@/lib/format'
 
 /* Shared by the admin, trainer and participant sessions pages: one look for the week list and the month calendar. */
 
@@ -113,9 +113,9 @@ export function ScheduleRow({
         to={to}
         className="flex items-stretch gap-3 rounded-sm py-2.5 hover:bg-surface-hover focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none"
       >
-        <span className="flex w-11 shrink-0 flex-col gap-0.5 tabular-nums">
+        <span className="flex w-12 shrink-0 flex-col gap-0.5 tabular-nums">
           <span className={clsx('text-body-emphasis', cancelled ? 'text-muted line-through' : 'text-primary')}>{formatTime(startsAt, timeZone)}</span>
-          <span className="text-caption text-secondary">{formatTime(endsAt, timeZone)}</span>
+          <span className="text-caption whitespace-nowrap text-secondary">{lengthOf(startsAt, endsAt)}</span>
         </span>
         <span aria-hidden="true" className={clsx('w-[3px] shrink-0 rounded-full', cancelled ? 'bg-default' : mode === 'online' ? 'bg-brand' : 'bg-success')} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -335,7 +335,7 @@ function Chip({ s, tint, timeZone }: { s: CalendarItem; tint: (typeof TINTS)[num
     <span className="flex min-w-0 flex-col rounded-[4px] border-l-[3px] px-1.5 py-1" style={{ background: tint.bg, borderColor: tint.bar, color: tint.text }}>
       <span className={clsx('truncate text-caption-strong', Boolean(s.cancelled) && 'line-through')}>{s.title}</span>
       <span className="truncate text-[11px] leading-[14px] tabular-nums opacity-80">
-        {formatTime(s.startsAt, timeZone)}–{formatTime(s.endsAt, timeZone)}
+        {formatTimeRange(s.startsAt, s.endsAt, timeZone)}
       </span>
     </span>
   )

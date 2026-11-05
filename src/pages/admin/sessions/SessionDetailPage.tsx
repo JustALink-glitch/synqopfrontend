@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { StatePanel } from '@/components/StatePanel'
+import { RecordingPanel } from '@/components/sessions/Recording'
 import { AlertBanner } from '@/components/ui/AlertBanner'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Choice'
@@ -15,7 +16,7 @@ import { Badge, PageHeader, Panel, PanelHeader } from '@/components/ui/Page'
 import { TextField } from '@/components/ui/TextField'
 import { ApiError } from '@/lib/api'
 import { formatDay, formatDayWithYear, formatTime, formatTimeRange, plural, weekdayList } from '@/lib/format'
-import { isPast, useCancelSession, useSession, whereLabel, type SessionDetail } from './data'
+import { isPast, startClass, useCancelSession, useSession, whereLabel, type SessionDetail } from './data'
 import { useSessionPaths } from './paths'
 import { ResourcesPanel } from './ResourcesPanel'
 import { SessionStatusBadge } from './SessionRow'
@@ -61,6 +62,17 @@ function SessionView({ data }: { data: SessionDetail }) {
   const canJoin = Boolean(s.joinUrl) && (s.status === 'scheduled' || s.status === 'in_progress')
   const reportDue = `${formatDay(s.report.dueAt, timeZone)}, ${formatTime(s.report.dueAt, timeZone)}`
 
+  // A Synqop Zoom meeting can be started as host from here (pilot feedback, Nov 2026).
+  const canStart = Boolean(s.zoom?.managed) && canJoin && (trainerArea || can.schedule)
+  const [starting, setStarting] = useState(false)
+  const [startError, setStartError] = useState<string | null>(null)
+  async function start() {
+    setStarting(true)
+    setStartError(null)
+    setStartError(await startClass(s.id))
+    setStarting(false)
+  }
+
   async function copy() {
     if (!s.joinUrl) return
     await navigator.clipboard.writeText(s.joinUrl).catch(() => undefined)
@@ -96,7 +108,12 @@ function SessionView({ data }: { data: SessionDetail }) {
           {s.report.submittedAt ? 'View report' : 'Write report'}
         </Button>
       )}
-      {trainerArea && canJoin && (
+      {trainerArea && canStart && (
+        <Button icon={<Video aria-hidden className="size-4" />} onClick={() => void start()} disabled={starting}>
+          {starting ? 'Opening Zoom…' : 'Start class'}
+        </Button>
+      )}
+      {trainerArea && canJoin && !canStart && (
         <a
           href={s.joinUrl!}
           target="_blank"
@@ -127,6 +144,11 @@ function SessionView({ data }: { data: SessionDetail }) {
         actions={actions}
       />
       {notice && <AlertBanner tone="success" title={notice} />}
+      {startError && (
+        <AlertBanner tone="error" title="Couldn’t start the class">
+          {startError}
+        </AlertBanner>
+      )}
       {s.cancelled && (
         <AlertBanner title={`Cancelled${s.cancelled.by ? ` by ${s.cancelled.by}` : ''} on ${formatDay(s.cancelled.at, timeZone)}`}>
           {s.cancelled.reason ? `Reason: ${s.cancelled.reason}. ` : ''}Cancelled sessions don’t count towards attendance or delivery, and need no report.
@@ -344,6 +366,12 @@ function SessionView({ data }: { data: SessionDetail }) {
               <PanelHeader id="details-title" title="Details" />
               <DetailList items={details(data, when, paths, false)} />
             </Panel>
+          )}
+          {s.recording && <RecordingPanel recording={s.recording} />}
+          {canStart && !trainerArea && (
+            <Button fullWidth icon={<Video aria-hidden className="size-4" />} onClick={() => void start()} disabled={starting}>
+              {starting ? 'Opening Zoom…' : 'Start class as host'}
+            </Button>
           )}
           {s.joinUrl && !s.cancelled && !trainerArea && !past && (
             <Button variant="secondary" fullWidth icon={<Video aria-hidden className="size-4" />} onClick={copy}>

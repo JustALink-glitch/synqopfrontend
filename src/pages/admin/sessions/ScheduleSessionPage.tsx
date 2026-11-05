@@ -2,6 +2,8 @@ import clsx from 'clsx'
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
+import { ClashWarning } from '@/components/sessions/ClashWarning'
+import { DurationField } from '@/components/sessions/DurationField'
 import { AlertBanner } from '@/components/ui/AlertBanner'
 import { Button } from '@/components/ui/Button'
 import { RadioGroup } from '@/components/ui/Choice'
@@ -9,14 +11,14 @@ import { FormSection } from '@/components/ui/FormLayout'
 import { PageHeader, Panel, PanelHeader } from '@/components/ui/Page'
 import { SelectField, TextField } from '@/components/ui/TextField'
 import { ApiError } from '@/lib/api'
-import { formatDate, plural, todayIn, weekdayList } from '@/lib/format'
+import { addToClock, formatDate, formatDuration, plural, todayIn, weekdayList } from '@/lib/format'
 import { MAX_SESSIONS_PER_SCHEDULE, occurrences, weekdayOf, type Weekday } from '@/lib/schedule'
-import { useScheduleSessions, useSessionOptions, type SessionMode } from './data'
+import { useClashes, useScheduleSessions, useSessionOptions, type SessionMode } from './data'
 import { useSessionPaths } from './paths'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 type Errors = Partial<
-  Record<'cohortId' | 'courseId' | 'trainerMemberId' | 'date' | 'start' | 'end' | 'repeat' | 'count' | 'until' | 'location' | 'joinUrl', string>
+  Record<'cohortId' | 'courseId' | 'trainerMemberId' | 'date' | 'start' | 'durationMinutes' | 'repeat' | 'count' | 'until' | 'location' | 'joinUrl', string>
 >
 
 /** /admin/courses/sessions/new?cohort=&course= — C1.02; /trainer/sessions/new — T3.03 Schedule session. */
@@ -35,7 +37,7 @@ export function ScheduleSessionPage() {
   const [trainerId, setTrainerId] = useState<string | null>(null)
   const [date, setDate] = useState('')
   const [start, setStart] = useState('10:00')
-  const [end, setEnd] = useState('12:00')
+  const [minutes, setMinutes] = useState(120)
   const [repeats, setRepeats] = useState<'none' | 'weekly'>('none')
   const [weekdays, setWeekdays] = useState<number[]>([])
   const [ends, setEnds] = useState<'count' | 'until'>('count')
@@ -76,7 +78,6 @@ export function ScheduleSessionPage() {
       cohortId: cohortId ? undefined : 'Choose a cohort.',
       courseId: courseId ? undefined : 'Choose a course.',
       date: effectiveDate ? undefined : 'Choose a date.',
-      end: end > start ? undefined : 'End must be after the start.',
       location: mode === 'in_person' && !location.trim() ? 'Enter where it happens.' : undefined,
       joinUrl:
         mode === 'online' && joinUrl.trim() && !/^https:\/\/\S+$/.test(joinUrl.trim()) ? 'Paste the full meeting link, starting with https://' : undefined,
@@ -102,7 +103,7 @@ export function ScheduleSessionPage() {
         trainerMemberId: trainer || null,
         date: effectiveDate,
         start,
-        end,
+        durationMinutes: minutes,
         repeat,
         mode,
         location,
@@ -120,6 +121,14 @@ export function ScheduleSessionPage() {
     }
   }
 
+  const clashes = useClashes(
+    effectiveDate && courseId && /^\d{2}:\d{2}$/.test(start)
+      ? { date: effectiveDate, start, durationMinutes: minutes, repeat, trainerMemberId: trainer || null, mode, joinUrl }
+      : null,
+  )
+  const trainerPerson = trainers.find((t) => t.id === trainer)
+  const finish = addToClock(start, minutes)
+  const clockRange = `${formatDuration(minutes)} (${start}–${finish.time}${finish.nextDay ? ', next day' : ''})`
   const submitLabel = dates.length > 1 ? `Schedule ${dates.length} sessions` : 'Schedule session'
 
   return (
@@ -211,8 +220,8 @@ export function ScheduleSessionPage() {
                     error={errors.date}
                   />
                 </div>
+                <DurationField value={minutes} onChange={set(setMinutes, 'durationMinutes')} start={start} error={errors.durationMinutes} />
                 <TextField label="Start" type="time" value={start} onChange={(e) => set(setStart, 'start')(e.target.value)} error={errors.start} />
-                <TextField label="End" type="time" value={end} onChange={(e) => set(setEnd, 'end')(e.target.value)} error={errors.end} />
               </div>
               <SelectField label="Repeat" value={repeats} onChange={(e) => set(setRepeats, 'repeat')(e.target.value as 'none' | 'weekly')}>
                 <option value="none">Does not repeat</option>
@@ -321,6 +330,7 @@ export function ScheduleSessionPage() {
               )}
             </FormSection>
 
+            <ClashWarning clashes={clashes.data} timeZone={timeZone} trainerName={trainerPerson ? `${trainerPerson.firstName} ${trainerPerson.lastName}` : undefined} />
             <div className="flex gap-3 max-md:flex-col-reverse max-md:[&>*]:h-11">
               <Button variant="secondary" onClick={() => navigate(-1)} disabled={schedule.isPending}>
                 Cancel
@@ -339,7 +349,7 @@ export function ScheduleSessionPage() {
               title={dates.length ? plural(dates.length, 'session') : 'Preview'}
               description={
                 dates.length
-                  ? `${repeats === 'weekly' ? weekdayList(effectiveDays, { plural: true }) : formatDate(dates[0]!, { year: true })}, ${start}–${end}`
+                  ? `${repeats === 'weekly' ? weekdayList(effectiveDays, { plural: true }) : formatDate(dates[0]!, { year: true })}, ${clockRange}`
                   : 'Choose a cohort and date to see the sessions.'
               }
             />

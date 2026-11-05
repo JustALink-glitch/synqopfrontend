@@ -19,6 +19,7 @@ import {
   ruleLabel,
   useRecordIntervention,
   useResolveFlags,
+  type InterventionInput,
   type Method,
   type Outcome,
   type ParticipantAttention,
@@ -191,6 +192,7 @@ export function RecordInterventionDialog({
   timeZone,
   onClose,
   onSaved,
+  save,
 }: {
   memberId: string
   name: string
@@ -198,8 +200,11 @@ export function RecordInterventionDialog({
   timeZone?: string
   onClose: () => void
   onSaved: () => void
+  /** Saves for several people instead (Needs attention bulk action); `name` then reads like "3 participants". */
+  save?: { run: (input: InterventionInput) => Promise<void>; pending: boolean }
 }) {
-  const record = useRecordIntervention(memberId)
+  const single = useRecordIntervention(memberId)
+  const record = save ? { mutateAsync: save.run, isPending: save.pending } : single
   const [initial] = useState(() => nowIn(timeZone))
   const [method, setMethod] = useState<Method>('call')
   const [date, setDate] = useState(initial.date)
@@ -232,7 +237,7 @@ export function RecordInterventionDialog({
       onClose={() => !record.isPending && onClose()}
       width={520}
       title="Record intervention"
-      description={`For ${name} · ${cohortName}`}
+      description={cohortName ? `For ${name} · ${cohortName}` : `For ${name}`}
       actions={
         <>
           <Button variant="secondary" onClick={onClose} disabled={record.isPending}>
@@ -267,7 +272,7 @@ export function RecordInterventionDialog({
             setErrors((p) => ({ ...p, notes: undefined }))
           }}
           error={errors.notes}
-          helper={`Visible to admins and ${name.split(' ')[0]}’s trainers. Never shown to the participant.`}
+          helper={save ? 'Saved for each of them. Visible to admins and their trainers. Never shown to participants.' : `Visible to admins and ${name.split(' ')[0]}’s trainers. Never shown to the participant.`}
         />
         <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
           <SelectField label="Outcome" value={outcome} onChange={(e) => setOutcome(e.target.value as Outcome)} helper="Outcome names are provisional.">

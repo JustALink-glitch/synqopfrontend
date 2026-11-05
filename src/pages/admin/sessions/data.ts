@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { api, ApiError } from '@/lib/api'
 
 export type SessionStatus = 'scheduled' | 'in_progress' | 'held' | 'cancelled'
 export type SessionMode = 'online' | 'in_person'
@@ -18,6 +19,8 @@ export interface Session {
   zoomMeetingId: string | null
   /** Where Zoom is with this session (C1.03, C2.01). */
   zoom?: { managed: boolean; pending: boolean; problem: string | null; importedAt: string | null; unmatched: number }
+  /** Zoom's cloud recording, linked once processed (pilot feedback, Nov 2026). */
+  recording?: { url: string; passcode: string | null; minutes: number | null } | null
   trainer: { id: string; name: string; isLead: boolean } | null
   series: { id: string; weekdays: number[]; sessions: number } | null
   number: number | null
@@ -77,7 +80,7 @@ export interface ScheduleInput {
   trainerMemberId: string | null
   date: string
   start: string
-  end: string
+  durationMinutes: number
   repeat: { weekdays: number[]; count?: number; until?: string } | null
   mode: SessionMode
   location: string
@@ -88,7 +91,7 @@ export interface EditInput {
   scope: 'this' | 'following' | 'all'
   date: string
   start: string
-  end: string
+  durationMinutes: number
   trainerMemberId: string | null
   mode: SessionMode
   location: string
@@ -145,6 +148,12 @@ export const useCancelSession = (id: string) =>
     api<{ cancelled: true; emailed: number }>(`/v1/sessions/${id}/cancel`, { method: 'POST', body: input }),
   )
 
+/** Several sessions at once (pilot feedback, Nov 2026); each person gets one email listing theirs. */
+export const useCancelSessions = () =>
+  useSessionMutation((input: { ids: string[]; reason: string; notify: boolean }) =>
+    api<{ cancelled: number; emailed: number; skipped: { id: string; reason: string }[] }>('/v1/sessions/cancel', { method: 'POST', body: input }),
+  )
+
 export interface ResourceInput {
   kind: 'file' | 'link'
   name: string
@@ -168,3 +177,56 @@ export function whereLabel(session: Pick<Session, 'mode' | 'location' | 'joinUrl
 
 /** The moment has passed. */
 export const isPast = (value: string) => Date.parse(value) < Date.now()
+
+/**
+ * Opens the class as its Zoom host (pilot feedback, Nov 2026). The tab opens first so browsers don't block it,
+ * then goes to Zoom's host link, which Synqop fetches fresh each time.
+ */
+export async function startClass(sessionId: string): Promise<string | null> {
+  const tab = window.open('', '_blank')
+  try {
+    const { url } = await api<{ url: string }>(`/v1/sessions/${sessionId}/zoom/start`, { method: 'POST', body: {} })
+    if (tab) tab.location.href = url
+    else window.location.href = url
+    return null
+  } catch (error) {
+    tab?.close()
+    return error instanceof ApiError && error.status < 500 ? error.message : 'Couldn’t reach Zoom. Try again.'
+  }
+}
+
+export interface Clashes {
+  trainer: { id: string; title: string; cohort: string; startsAt: string; endsAt: string }[]
+  zoom: { slot: string; hosts: number; sessions: { id: string; title: string; cohort: string; startsAt: string; endsAt: string }[] }[]
+}
+
+export interface ClashInput {
+  date: string
+  start: string
+  durationMinutes: number
+  repeat?: { weekdays: number[]; count?: number; until?: string } | null
+  trainerMemberId: string | null
+  mode: SessionMode
+  joinUrl: string
+  excludeId?: string
+}
+
+/**
+ * Warns before saving when the trainer is already teaching then, or every Zoom host is in use (pilot feedback,
+ * Nov 2026). Asks once the form has been still for half a second, so typing doesn't send a request per key.
+ */
+export function useClashes(input: ClashInput | null) {
+  const key = input ? JSON.stringify(input) : null
+  const [settled, setSettled] = useState(key)
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(key), 500)
+    return () => clearTimeout(t)
+  }, [key])
+  return useQuery({
+    queryKey: ['session-clashes', settled],
+    enabled: Boolean(settled),
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+    queryFn: ({ signal }) => api<Clashes>('/v1/sessions/clashes', { method: 'POST', body: JSON.parse(settled!), signal }),
+  })
+}

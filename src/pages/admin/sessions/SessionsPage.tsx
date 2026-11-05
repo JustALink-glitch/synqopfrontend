@@ -1,7 +1,15 @@
-import { useState } from 'react'
+import { CalendarX2 } from 'lucide-react'
+import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
+import { BulkBar } from '@/components/collection/Collection'
+import { useSelection } from '@/components/collection/selection'
 import { StatePanel } from '@/components/StatePanel'
+import { AlertBanner } from '@/components/ui/AlertBanner'
+import { Checkbox } from '@/components/ui/Choice'
+import { Dialog } from '@/components/ui/Dialog'
+import { TextField } from '@/components/ui/TextField'
+import { ApiError } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { DetailList } from '@/components/ui/FormLayout'
 import { addMonths, mondayOf, monthGrid, monthLabel, monthOf, useScheduleView, weekRange } from '@/components/sessions/period'
@@ -9,11 +17,11 @@ import { DayGroups, MonthCalendar, PeriodNav, ViewSwitch } from '@/components/se
 import { CalendarIcon, ChevronRightIcon } from '@/components/ui/icons'
 import { Badge, EmptyState, Panel, PanelHeader } from '@/components/ui/Page'
 import { FilterSelect } from '@/components/ui/SearchField'
-import { formatDay, localDate, todayIn } from '@/lib/format'
+import { formatDay, formatTimeRange, localDate, plural, todayIn } from '@/lib/format'
 import { addDays } from '@/lib/schedule'
 import { useCohorts, useCourses } from '@/pages/admin/programmes/data'
 import { CoursesHeader } from './CoursesHeader'
-import { useSessions } from './data'
+import { useCancelSessions, useSessions, type Session } from './data'
 import { SessionRow } from './SessionRow'
 
 /** /admin/courses — C1.01 Sessions (week list or month calendar), C1.01e empty. */
@@ -39,6 +47,20 @@ export function SessionsPage() {
   const thisWeek = week === mondayOf(today)
   const thisMonth = month === monthOf(today)
   const openCohorts = (cohorts.data ?? []).filter((c) => ['active', 'upcoming', 'draft'].includes(c.status))
+
+  // Tick upcoming sessions to cancel several at once (pilot feedback, Nov 2026).
+  const changeable = sessions.filter((s) => s.status === 'scheduled' && !s.cancelled)
+  const selection = useSelection(changeable.map((s) => s.id))
+  const [cancelling, setCancelling] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const row = (s: Session) => (
+    <SessionRow
+      key={s.id}
+      session={s}
+      timeZone={timeZone}
+      select={s.status === 'scheduled' && !s.cancelled ? { checked: selection.has(s.id), onChange: () => selection.toggle(s.id) } : undefined}
+    />
+  )
 
   const scheduleButton = (
     <Button
@@ -99,6 +121,31 @@ export function SessionsPage() {
             <ViewSwitch value={view} onChange={setView} />
           </PeriodNav>
 
+          {notice && <AlertBanner tone="success" title={notice} />}
+          <BulkBar
+            selection={selection}
+            noun={['session', 'sessions']}
+            actions={[
+              {
+                label: 'Cancel sessions',
+                icon: <CalendarX2 aria-hidden className="size-4" />,
+                destructive: true,
+                run: async () => (setNotice(null), setCancelling(true)),
+              },
+            ]}
+          />
+          {cancelling && (
+            <CancelSessionsDialog
+              sessions={changeable.filter((s) => selection.has(s.id))}
+              timeZone={timeZone}
+              onClose={() => setCancelling(false)}
+              onDone={(text) => {
+                setCancelling(false)
+                selection.clear()
+                setNotice(text)
+              }}
+            />
+          )}
           <div className="flex items-start gap-4 max-lg:flex-col">
             <Panel className="min-w-0 flex-1 gap-4 max-lg:w-full" aria-busy={query.isPending}>
               {query.isPending ? (
@@ -111,12 +158,12 @@ export function SessionsPage() {
                   items={sessions}
                   colourKey={(s) => s.course.id}
                   colourLabel={(s) => s.course.name}
-                  row={(s) => <SessionRow key={s.id} session={s} timeZone={timeZone} />}
+                  row={row}
                 />
               ) : sessions.length === 0 ? (
                 <EmptyState icon={<CalendarIcon size={24} />} title="No sessions this week" body="Use the arrows to see other weeks, or schedule a session." />
               ) : (
-                <DayGroups items={sessions} timeZone={timeZone} today={today} row={(s) => <SessionRow key={s.id} session={s} timeZone={timeZone} />} />
+                <DayGroups items={sessions} timeZone={timeZone} today={today} row={row} />
               )}
             </Panel>
 
@@ -164,5 +211,95 @@ export function SessionsPage() {
         </>
       )}
     </>
+  )
+}
+
+/** Cancel several sessions with one reason (pilot feedback, Nov 2026). Each person gets one email listing theirs. */
+function CancelSessionsDialog({
+  sessions,
+  timeZone,
+  onClose,
+  onDone,
+}: {
+  sessions: Session[]
+  timeZone: string | undefined
+  onClose: () => void
+  onDone: (notice: string) => void
+}) {
+  const cancel = useCancelSessions()
+  const [reason, setReason] = useState('')
+  const [notify, setNotify] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [failed, setFailed] = useState<string | null>(null)
+  const sorted = [...sessions].sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!reason.trim()) return setError('Add a reason. Participants see it in the email.')
+    setFailed(null)
+    try {
+      const r = await cancel.mutateAsync({ ids: sorted.map((s) => s.id), reason, notify })
+      onDone(
+        [
+          `${plural(r.cancelled, 'session')} cancelled.`,
+          notify && r.cancelled ? `${plural(r.emailed, 'email')} sent.` : '',
+          r.skipped.length ? `${plural(r.skipped.length, 'session')} skipped: ${r.skipped[0]!.reason}` : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+      )
+    } catch (err) {
+      setFailed(err instanceof ApiError && err.status < 500 ? err.message : 'Nothing was cancelled. Try again.')
+    }
+  }
+
+  return (
+    <Dialog
+      open
+      onClose={() => !cancel.isPending && onClose()}
+      width={440}
+      title={`Cancel ${plural(sorted.length, 'session')}?`}
+      description="Each participant and trainer gets one email listing the sessions that affect them."
+      actions={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={cancel.isPending}>
+            Keep sessions
+          </Button>
+          <Button type="submit" form="cancel-sessions" variant="destructive" disabled={cancel.isPending}>
+            {cancel.isPending ? 'Cancelling…' : `Cancel ${plural(sorted.length, 'session')}`}
+          </Button>
+        </>
+      }
+    >
+      <form id="cancel-sessions" onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
+        {failed && (
+          <AlertBanner tone="error" title="Couldn’t cancel">
+            {failed}
+          </AlertBanner>
+        )}
+        <ul className="max-h-40 overflow-y-auto rounded-md border border-default px-3">
+          {sorted.map((s) => (
+            <li key={s.id} className="flex flex-col border-b border-default py-2 last:border-b-0">
+              <span className="truncate text-body-strong text-primary">{s.title}</span>
+              <span className="truncate text-caption text-secondary">
+                {formatDay(s.startsAt, timeZone)}, {formatTimeRange(s.startsAt, s.endsAt, timeZone)} · {s.cohort.name}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <TextField
+          label="Reason"
+          autoFocus
+          value={reason}
+          onChange={(e) => {
+            setReason(e.target.value)
+            setError(null)
+          }}
+          error={error}
+          helper="Shown to participants in the email."
+        />
+        <Checkbox label="Email participants and trainers" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+      </form>
+    </Dialog>
   )
 }

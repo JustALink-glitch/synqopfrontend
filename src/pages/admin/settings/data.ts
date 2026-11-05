@@ -105,7 +105,11 @@ export const useProgrammeSetup = () =>
 export const useSaveProgrammeSetup = () => useSave<ProgrammeSetup>('/v1/settings/programme-setup', 'programme-setup', [['assignments'], ['sessions']])
 
 export interface AttendanceSettings {
-  zoom: { available: boolean; connected: boolean; email: string | null; connectedAt: string | null; problem: string | null; lastImportAt: string | null }
+  zoom: { available: boolean; connected: boolean; email: string | null; connectedAt: string | null; problem: string | null; lastImportAt: string | null
+    /** Licensed Zoom users Synqop can host classes on at the same time. */
+    hosts?: number
+    /** Features waiting for the admin to connect again and approve new permissions (Nov 2026). */
+    missing?: ('recordings' | 'hosts' | 'start')[] }
   joinLinks: 'personal' | 'shared'
   presentMinPct: number
   late: { enabled: boolean; minutes: number }
