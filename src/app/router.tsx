@@ -73,6 +73,7 @@ import { TrainerDetailPage } from '@/pages/admin/people/TrainerDetailPage'
 import { TrainersPage } from '@/pages/admin/people/TrainersPage'
 import { ForgotPasswordPage } from '@/pages/onboarding/ForgotPasswordPage'
 import { InvitationPage } from '@/pages/onboarding/InvitationPage'
+import { ConfirmLinkPage } from '@/pages/onboarding/ConfirmLinkPage'
 import { OrganisationPage } from '@/pages/onboarding/OrganisationPage'
 import { ResetPasswordPage } from '@/pages/onboarding/ResetPasswordPage'
 import { SignUpPage } from '@/pages/onboarding/SignUpPage'
@@ -256,6 +257,7 @@ export const routes: RouteObject[] = [
   // Account recovery, all roles (S1)
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
+  { path: '/auth/confirm', element: <ConfirmLinkPage /> },
   // Staff and participant invitations (T1 / P1)
   { path: '/invite/:token', element: <InvitationPage /> },
   { path: '/welcome/profile', element: <WelcomeProfilePage /> },

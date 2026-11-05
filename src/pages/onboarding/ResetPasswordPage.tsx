@@ -16,7 +16,9 @@ const FOOTER = 'The same for admins, trainers and participants.'
 /** What the reset link told us when the app opened. */
 function readLink() {
   const hash = new URLSearchParams(initialUrl.hash.replace(/^#/, ''))
-  const query = initialUrl.searchParams
+  // Links now open /auth/confirm first, which checks the token and then comes here with ?type=recovery (Nov 2026).
+  const current = new URL(window.location.href).searchParams
+  const query = current.has('type') || current.has('error_code') ? current : initialUrl.searchParams
   const get = (key: string) => hash.get(key) ?? query.get(key)
   return {
     // Supabase redirects with error=access_denied&error_code=otp_expired for expired or used links.
